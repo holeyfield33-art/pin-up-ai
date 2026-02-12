@@ -1,14 +1,34 @@
 import os
 import sqlite3
 from pathlib import Path
+import logging
+from contextlib import contextmanager
 
+logger = logging.getLogger(__name__)
 DB_PATH = Path(os.getenv("PINUP_DB", "./pinup.db")).resolve()
 
 
 def get_connection() -> sqlite3.Connection:
+    """Get database connection with row factory."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+@contextmanager
+def get_db():
+    """Context manager for database connections."""
+    conn = get_connection()
+    try:
+        yield conn
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Database error: {e}")
+        raise
+    finally:
+        conn.close()
 
 
 def init_db() -> None:
@@ -40,7 +60,8 @@ def init_db() -> None:
             """
             CREATE TABLE IF NOT EXISTS collections (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE
+                name TEXT NOT NULL UNIQUE,
+                description TEXT
             )
             """
         )
