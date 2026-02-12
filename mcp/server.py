@@ -1,166 +1,366 @@
-"""
-MCP Server for Pin-Up AI
-Provides AI agents with tools to search, manage, and save snippets
-"""
-import asyncio
-import httpx
+"""MCP (Model Context Protocol) Server - Provides tools for AI agents."""
+
 import json
 import logging
-from typing import Any
+import sys
+import os
+from typing import Any, Callable, Dict, List
+from datetime import datetime
+
+# Add backend to path
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend"))
+
+from sqlalchemy.orm import Session
+from app.database import SessionLocal
+from app.services import SnippetService, TagService, CollectionService
+from app.schemas import SnippetCreate
 
 logger = logging.getLogger(__name__)
 
-# Configuration
-BACKEND_URL = "http://127.0.0.1:8000"
-TIMEOUT = 30
+
+class MCPTool:
+    """Represents an MCP tool definition and handler."""
+
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        parameters: Dict[str, Any],
+        handler: Callable,
+    ):
+        """Initialize MCP tool."""
+        self.name = name
+        self.description = description
+        self.parameters = parameters
+        self.handler = handler
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert tool to dictionary format."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "inputSchema": {
+                "type": "object",
+                "properties": self.parameters.get("properties", {}),
+                "required": self.parameters.get("required", []),
+            },
+        }
 
 
-class MCPServerError(Exception):
-    """Base MCP server exception."""
-    pass
+class MCPServer:
+    """MCP Server providing AI agent tools."""
 
+    def __init__(self):
+        """Initialize MCP server."""
+        self.tools: Dict[str, MCPTool] = {}
+        self._register_tools()
+        logger.info("MCP Server initialized with tools")
 
-class BackendClient:
-    """HTTP client for FastAPI backend."""
-    
-    def __init__(self, base_url: str = BACKEND_URL, timeout: int = TIMEOUT):
-        self.base_url = base_url
-        self.timeout = timeout
-    
-    async def search_snippets(self, query: str, limit: int = 50) -> list[dict]:
-        """Search snippets using full-text search."""
+    def _register_tools(self) -> None:
+        """Register all available tools."""
+        # Search snippets
+        self.register_tool(
+            MCPTool(
+                name="search_snippets",
+                description="Search snippets by query",
+                parameters={
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search query",
+                            "minLength": 1,
+                            "maxLength": 500,
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results",
+                            "default": 20,
+                            "minimum": 1,
+                            "maximum": 100,
+                        },
+                    },
+                    "required": ["query"],
+                },
+                handler=self._search_snippets,
+            )
+        )
+
+        # Get single snippet
+        self.register_tool(
+            MCPTool(
+                name="get_snippet",
+                description="Get snippet by ID",
+                parameters={
+                    "properties": {
+                        "snippet_id": {
+                            "type": "string",
+                            "description": "Snippet ID",
+                        },
+                    },
+                    "required": ["snippet_id"],
+                },
+                handler=self._get_snippet,
+            )
+        )
+
+        # List snippets
+        self.register_tool(
+            MCPTool(
+                name="list_snippets",
+                description="List all snippets",
+                parameters={
+                    "properties": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results",
+                            "default": 10,
+                            "minimum": 1,
+                            "maximum": 100,
+                        },
+                        "offset": {
+                            "type": "integer",
+                            "description": "Offset for pagination",
+                            "default": 0,
+                            "minimum": 0,
+                        },
+                    },
+                    "required": [],
+                },
+                handler=self._list_snippets,
+            )
+        )
+
+        # Create snippet
+        self.register_tool(
+            MCPTool(
+                name="create_snippet",
+                description="Create a new snippet",
+                parameters={
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Snippet title",
+                            "minLength": 1,
+                            "maxLength": 255,
+                        },
+                        "body": {
+                            "type": "string",
+                            "description": "Snippet content",
+                            "minLength": 1,
+                        },
+                        "language": {
+                            "type": "string",
+                            "description": "Programming language",
+                            "default": "plaintext",
+                        },
+                        "source": {
+                            "type": "string",
+                            "description": "Source of snippet",
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Tag names",
+                            "default": [],
+                        },
+                    },
+                    "required": ["title", "body"],
+                },
+                handler=self._create_snippet,
+            )
+        )
+
+        # List collections
+        self.register_tool(
+            MCPTool(
+                name="list_collections",
+                description="List all collections",
+                parameters={
+                    "properties": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results",
+                            "default": 100,
+                            "minimum": 1,
+                            "maximum": 1000,
+                        },
+                    },
+                    "required": [],
+                },
+                handler=self._list_collections,
+            )
+        )
+
+        # List tags
+        self.register_tool(
+            MCPTool(
+                name="list_tags",
+                description="List all tags with counts",
+                parameters={
+                    "properties": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results",
+                            "default": 100,
+                            "minimum": 1,
+                            "maximum": 1000,
+                        },
+                    },
+                    "required": [],
+                },
+                handler=self._list_tags,
+            )
+        )
+
+    def register_tool(self, tool: MCPTool) -> None:
+        """Register a tool."""
+        self.tools[tool.name] = tool
+        logger.info(f"Registered MCP tool: {tool.name}")
+
+    def get_tools(self) -> List[Dict[str, Any]]:
+        """Get all tools as dictionaries."""
+        return [tool.to_dict() for tool in self.tools.values()]
+
+    async def call_tool(self, tool_name: str, **kwargs) -> Dict[str, Any]:
+        """Call a tool by name."""
+        if tool_name not in self.tools:
+            return {
+                "status": "error",
+                "error": f"Unknown tool: {tool_name}",
+            }
+
+        tool = self.tools[tool_name]
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/snippets/search/query",
-                    params={"q": query, "limit": limit},
-                )
-                response.raise_for_status()
-                return response.json()
+            result = await tool.handler(**kwargs)
+            return {
+                "status": "success",
+                "data": result,
+            }
+        except ValueError as e:
+            logger.warning(f"Tool {tool_name} validation error: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+            }
         except Exception as e:
-            logger.error(f"Search failed: {e}")
-            raise MCPServerError(f"Failed to search snippets: {str(e)}")
-    
-    async def get_snippet(self, snippet_id: int) -> dict:
-        """Get a specific snippet by ID."""
+            logger.error(f"Tool {tool_name} error: {e}", exc_info=True)
+            return {
+                "status": "error",
+                "error": "Internal server error",
+            }
+
+    async def _search_snippets(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
+        """Search snippets."""
+        db = SessionLocal()
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(f"{self.base_url}/snippets/{snippet_id}")
-                response.raise_for_status()
-                return response.json()
-        except Exception as e:
-            logger.error(f"Get snippet failed: {e}")
-            raise MCPServerError(f"Failed to get snippet: {str(e)}")
-    
-    async def list_snippets(self, limit: int = 50) -> list[dict]:
+            snippets, _ = SnippetService.search_snippets(db, query=query, limit=limit)
+            return [
+                {
+                    "id": s.id,
+                    "title": s.title,
+                    "body": s.body[:200],  # Preview
+                    "language": s.language,
+                    "created_at": s.created_at.isoformat(),
+                }
+                for s in snippets
+            ]
+        finally:
+            db.close()
+
+    async def _get_snippet(self, snippet_id: str) -> Dict[str, Any]:
+        """Get snippet by ID."""
+        db = SessionLocal()
+        try:
+            snippet = SnippetService.get_snippet(db, snippet_id)
+            if not snippet:
+                raise ValueError(f"Snippet not found: {snippet_id}")
+
+            return {
+                "id": snippet.id,
+                "title": snippet.title,
+                "body": snippet.body,
+                "language": snippet.language,
+                "source": snippet.source,
+                "tags": [{"id": t.id, "name": t.name} for t in snippet.tags],
+                "collections": [{"id": c.id, "name": c.name} for c in snippet.collections],
+                "created_at": snippet.created_at.isoformat(),
+            }
+        finally:
+            db.close()
+
+    async def _list_snippets(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
         """List snippets."""
+        db = SessionLocal()
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/snippets/",
-                    params={"limit": limit},
-                )
-                response.raise_for_status()
-                return response.json()
-        except Exception as e:
-            logger.error(f"List snippets failed: {e}")
-            raise MCPServerError(f"Failed to list snippets: {str(e)}")
-    
-    async def create_snippet(self, title: str, body: str, language: str | None = None, source: str | None = None) -> dict:
-        """Create a new snippet."""
+            snippets, total = SnippetService.list_snippets(db, limit=limit, offset=offset)
+            return [
+                {
+                    "id": s.id,
+                    "title": s.title,
+                    "body": s.body[:100],  # Preview
+                    "language": s.language,
+                    "created_at": s.created_at.isoformat(),
+                }
+                for s in snippets
+            ]
+        finally:
+            db.close()
+
+    async def _create_snippet(
+        self,
+        title: str,
+        body: str,
+        language: str = "plaintext",
+        source: str = None,
+        tags: List[str] = None,
+    ) -> Dict[str, Any]:
+        """Create snippet."""
+        db = SessionLocal()
         try:
-            payload = {"title": title, "body": body, "language": language, "source": source, "tags": [], "collection_id": None}
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(f"{self.base_url}/snippets/", json=payload)
-                response.raise_for_status()
-                return response.json()
-        except Exception as e:
-            logger.error(f"Create snippet failed: {e}")
-            raise MCPServerError(f"Failed to create snippet: {str(e)}")
-    
-    async def list_collections(self, limit: int = 100) -> list[dict]:
-        """List all collections."""
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/collections/",
-                    params={"limit": limit},
-                )
-                response.raise_for_status()
-                return response.json()
-        except Exception as e:
-            logger.error(f"List collections failed: {e}")
-            raise MCPServerError(f"Failed to list collections: {str(e)}")
-    
-    async def list_tags(self, limit: int = 100) -> list[dict]:
-        """List all tags."""
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/tags/",
-                    params={"limit": limit},
-                )
-                response.raise_for_status()
-                return response.json()
-        except Exception as e:
-            logger.error(f"List tags failed: {e}")
-            raise MCPServerError(f"Failed to list tags: {str(e)}")
-
-
-backend_client = BackendClient()
-
-
-# Tool definitions
-TOOLS = {
-    "search_snippets": {"description": "Search snippets by query", "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "limit": {"type": "integer", "default": 50}}, "required": ["query"]}},
-    "get_snippet": {"description": "Get a specific snippet", "inputSchema": {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}},
-    "list_snippets": {"description": "List all snippets", "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer", "default": 50}}}},
-    "create_snippet": {"description": "Create a new snippet", "inputSchema": {"type": "object", "properties": {"title": {"type": "string"}, "body": {"type": "string"}, "language": {"type": "string"}, "source": {"type": "string"}}, "required": ["title", "body"]}},
-    "list_collections": {"description": "List all collections", "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer", "default": 100}}}},
-    "list_tags": {"description": "List all tags", "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer", "default": 100}}}},
-}
-
-
-async def handle_tool_call(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-    """Handle MCP tool calls and return results."""
-    try:
-        if tool_name == "search_snippets":
-            result = await backend_client.search_snippets(
-                query=arguments.get("query"),
-                limit=arguments.get("limit", 50),
+            # Create snippet
+            snippet_create = SnippetCreate(
+                title=title,
+                body=body,
+                language=language,
+                source=source,
             )
-            return {"status": "success", "data": result}
-        elif tool_name == "get_snippet":
-            result = await backend_client.get_snippet(snippet_id=arguments.get("id"))
-            return {"status": "success", "data": result}
-        elif tool_name == "list_snippets":
-            result = await backend_client.list_snippets(limit=arguments.get("limit", 50))
-            return {"status": "success", "data": result}
-        elif tool_name == "create_snippet":
-            result = await backend_client.create_snippet(
-                title=arguments.get("title"),
-                body=arguments.get("body"),
-                language=arguments.get("language"),
-                source=arguments.get("source"),
-            )
-            return {"status": "success", "data": result}
-        elif tool_name == "list_collections":
-            result = await backend_client.list_collections(limit=arguments.get("limit", 100))
-            return {"status": "success", "data": result}
-        elif tool_name == "list_tags":
-            result = await backend_client.list_tags(limit=arguments.get("limit", 100))
-            return {"status": "success", "data": result}
-        else:
-            return {"status": "error", "message": f"Unknown tool: {tool_name}"}
-    except MCPServerError as e:
-        return {"status": "error", "message": str(e)}
-    except Exception as e:
-        logger.error(f"Tool error: {e}", exc_info=True)
-        return {"status": "error", "message": "Internal server error"}
+            snippet = SnippetService.create_snippet(db, snippet_create)
+
+            # Add tags if provided
+            if tags:
+                for tag_name in tags:
+                    try:
+                        TagService.create_tag(db, name=tag_name)
+                    except ValueError:
+                        pass  # Tag already exists
+
+            return {
+                "id": snippet.id,
+                "title": snippet.title,
+                "language": snippet.language,
+                "created_at": snippet.created_at.isoformat(),
+            }
+        finally:
+            db.close()
+
+    async def _list_collections(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """List collections."""
+        db = SessionLocal()
+        try:
+            collections, _ = CollectionService.list_collections(db, limit=limit)
+            return collections
+        finally:
+            db.close()
+
+    async def _list_tags(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """List tags."""
+        db = SessionLocal()
+        try:
+            tags, _ = TagService.list_tags(db, limit=limit)
+            return tags
+        finally:
+            db.close()
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    print("Pin-Up AI MCP Server")
-    print(f"Backend: {BACKEND_URL}")
-    print(f"Available tools: {list(TOOLS.keys())}")
+# Global MCP server instance
+mcp_server = MCPServer()

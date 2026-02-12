@@ -9,28 +9,43 @@
   "ctx": {},
   "package": {
     "productName": "Pin-Up AI",
-    "version": "0.1.0",
-    "identifier": "com.pinup.ai"
+    "version": "1.0.0",
+    "identifier": "com.pinupai.app"
   },
   "tauri": {
     "allowlist": {
       "all": false,
       "http": {
-        "all": true
+        "scope": ["http://127.0.0.1:8000/*"]
       },
       "shell": {
         "all": false,
-        "execute": false,
-        "open": true
+        "execute": true,
+        "open": true,
+        "sidecar": true,
+        "scope": ["{backend}"
+      },
+      "fs": {
+        "all": false,
+        "scope": ["$LOCALDATA/pin-up-ai/**"]
+      },
+      "window": {
+        "all": true
+      },
+      "dialog": {
+        "all": true
       }
     },
     "windows": [
       {
         "fullscreen": false,
-        "height": 800,
+        "height": 900,
         "resizable": true,
-        "title": "Pin-Up AI",
-        "width": 1200
+        "title": "Pin-Up AI - Snippet Manager",
+        "width": 1400,
+        "minHeight": 400,
+        "minWidth": 600,
+        "decorations": true
       }
     ],
     "security": {
@@ -39,8 +54,8 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
-    "identifier": "com.pinup.ai",
+    "targets": ["msi", "app", "deb", "dmg"],
+    "identifier": "com.pinupai.app",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -48,5 +63,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  }
+}
   }
 }
