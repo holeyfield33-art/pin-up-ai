@@ -1,0 +1,33 @@
+[package]
+name = "pin-up-ai"
+version = "0.1.0"
+description = "Pin-Up AI - AI Message Highlighter"
+authors = ["holeyfield33-art"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.60"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tauri = { version = "1.5", features = [
+  "shell-open",
+  "dialog-ask",
+  "dialog-confirm",
+] }
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+
+[features]
+# by default Tauri runs in strict mode where all net requests are forbidden.
+# TAURI_SECURITY_STRICT=false is used during development
+# If you want to invoke requests using `reqwest` in the frontend, you must define your own commands
+# examples:
+# command 1: `$sidecar/xray --bridge ws://127.0.0.1:8000`
+# See the Tauri documentation for more information about this file
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

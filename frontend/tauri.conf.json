@@ -1,0 +1,52 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist",
+    "frontendDist": "../dist"
+  },
+  "ctx": {},
+  "package": {
+    "productName": "Pin-Up AI",
+    "version": "0.1.0",
+    "identifier": "com.pinup.ai"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "http": {
+        "all": true
+      },
+      "shell": {
+        "all": false,
+        "execute": false,
+        "open": true
+      }
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 800,
+        "resizable": true,
+        "title": "Pin-Up AI",
+        "width": 1200
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "identifier": "com.pinup.ai",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
