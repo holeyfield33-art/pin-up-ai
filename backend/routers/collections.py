@@ -49,7 +49,6 @@ def create_collection(payload: CollectionIn):
                 "INSERT INTO collections (name, description) VALUES (?, ?)",
                 (payload.name, payload.description),
             )
-            conn.commit()
             row = conn.execute(
                 "SELECT * FROM collections WHERE id = ?", (cur.lastrowid,)
             ).fetchone()
@@ -90,7 +89,6 @@ def delete_collection(collection_id: int):
             if not existing:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
             conn.execute("DELETE FROM collections WHERE id = ?", (collection_id,))
-            conn.commit()
         except HTTPException:
             raise
         except Exception as e:
