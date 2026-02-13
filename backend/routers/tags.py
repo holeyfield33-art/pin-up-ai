@@ -46,7 +46,6 @@ def create_tag(payload: TagIn):
         try:
             cur = conn.cursor()
             cur.execute("INSERT INTO tags (name) VALUES (?)", (payload.name,))
-            conn.commit()
             row = conn.execute("SELECT * FROM tags WHERE id = ?", (cur.lastrowid,)).fetchone()
             return _row_to_tag(row, conn)
         except Exception as e:
@@ -81,7 +80,6 @@ def delete_tag(tag_id: int):
             if not existing:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
             conn.execute("DELETE FROM tags WHERE id = ?", (tag_id,))
-            conn.commit()
         except HTTPException:
             raise
         except Exception as e:

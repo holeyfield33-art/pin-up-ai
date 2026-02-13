@@ -1,3 +1,4 @@
+import re
 import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, status
@@ -8,13 +9,30 @@ from ..models import SnippetIn, SnippetOut
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Characters with special meaning in FTS5 query syntax
+_FTS5_SPECIAL = re.compile(r'["\*\(\)\-\+\^:]')
+
+
+def _sanitize_fts_query(raw: str) -> str:
+    """Escape FTS5 special characters to prevent query injection.
+
+    Wraps each whitespace-delimited token in double quotes so that
+    special characters are treated as literals by the FTS5 MATCH engine.
+    """
+    tokens = raw.strip().split()
+    if not tokens:
+        return '""'
+    # Quote each token individually; interior double quotes are doubled per FTS5 spec
+    return " ".join(f'"{t.replace(chr(34), chr(34)+chr(34))}"' for t in tokens)
+
 
 def _row_to_snippet(row, conn=None) -> SnippetOut:
     """Convert database row to SnippetOut model."""
     if row is None:
         return None
-    
+
     tags = []
+    collection_id = None
     if conn:
         try:
             tag_rows = conn.execute(
@@ -24,7 +42,17 @@ def _row_to_snippet(row, conn=None) -> SnippetOut:
             tags = [t["name"] for t in tag_rows]
         except Exception as e:
             logger.warning(f"Failed to fetch tags for snippet {row['id']}: {e}")
-    
+
+        try:
+            col_row = conn.execute(
+                "SELECT collection_id FROM snippet_collections WHERE snippet_id = ? LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if col_row:
+                collection_id = col_row["collection_id"]
+        except Exception as e:
+            logger.warning(f"Failed to fetch collection for snippet {row['id']}: {e}")
+
     return SnippetOut(
         id=row["id"],
         title=row["title"],
@@ -33,7 +61,7 @@ def _row_to_snippet(row, conn=None) -> SnippetOut:
         source=row["source"],
         created_at=datetime.fromisoformat(row["created_at"]),
         tags=tags,
-        collection_id=row.get("collection_id"),
+        collection_id=collection_id,
     )
 
 
@@ -57,7 +85,7 @@ def list_snippets(
                     "SELECT * FROM snippets ORDER BY created_at DESC LIMIT ? OFFSET ?",
                     (limit, offset),
                 ).fetchall()
-            
+
             return [_row_to_snippet(row, conn) for row in rows]
         except Exception as e:
             logger.error(f"Error listing snippets: {e}")
@@ -75,20 +103,20 @@ def create_snippet(payload: SnippetIn):
                 (payload.title, payload.body, payload.language, payload.source),
             )
             snippet_id = cur.lastrowid
-            
+
             for tag_id in payload.tags:
                 cur.execute(
                     "INSERT INTO snippet_tags (snippet_id, tag_id) VALUES (?, ?)",
                     (snippet_id, tag_id),
                 )
-            
+
             if payload.collection_id:
                 cur.execute(
                     "INSERT INTO snippet_collections (snippet_id, collection_id) VALUES (?, ?)",
                     (snippet_id, payload.collection_id),
                 )
-            
-            conn.commit()
+
+            # No explicit conn.commit() — the get_db() context manager commits on success
             row = conn.execute("SELECT * FROM snippets WHERE id = ?", (snippet_id,)).fetchone()
             return _row_to_snippet(row, conn)
         except Exception as e:
@@ -121,7 +149,6 @@ def delete_snippet(snippet_id: int):
             if not existing:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Snippet not found")
             conn.execute("DELETE FROM snippets WHERE id = ?", (snippet_id,))
-            conn.commit()
         except HTTPException:
             raise
         except Exception as e:
@@ -138,10 +165,11 @@ def search_snippets(
     """Full-text search snippets using FTS5."""
     with get_db() as conn:
         try:
+            safe_query = _sanitize_fts_query(q)
             rows = conn.execute(
                 """SELECT s.* FROM snippets_fts f JOIN snippets s ON s.id = f.rowid
                    WHERE snippets_fts MATCH ? ORDER BY rank LIMIT ? OFFSET ?""",
-                (q, limit, offset),
+                (safe_query, limit, offset),
             ).fetchall()
             return [_row_to_snippet(row, conn) for row in rows]
         except Exception as e:

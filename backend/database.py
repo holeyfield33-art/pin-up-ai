@@ -13,6 +13,7 @@ def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
@@ -87,6 +88,12 @@ def init_db() -> None:
             )
             """
         )
+        # Indexes on foreign key columns for join performance
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_snippet_tags_tag_id ON snippet_tags(tag_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_snippet_tags_snippet_id ON snippet_tags(snippet_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_snippet_collections_collection_id ON snippet_collections(collection_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_snippet_collections_snippet_id ON snippet_collections(snippet_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_snippets_created_at ON snippets(created_at)")
         cur.execute(
             """
             CREATE VIRTUAL TABLE IF NOT EXISTS snippets_fts

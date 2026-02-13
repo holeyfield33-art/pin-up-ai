@@ -1,4 +1,4 @@
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export const api = async (path, options = {}) => {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -8,6 +8,10 @@ export const api = async (path, options = {}) => {
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(error.detail || `HTTP ${res.status}`);
+  }
+  // 204 No Content has no body to parse
+  if (res.status === 204) {
+    return null;
   }
   return res.json();
 };
