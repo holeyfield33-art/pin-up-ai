@@ -43,6 +43,14 @@ class RateLimiter:
         self.clients[client_id].append(now)
         return True
 
+    def evict_stale(self) -> int:
+        """Remove clients with no recent activity. Returns number evicted."""
+        now = time()
+        stale = [cid for cid, ts in self.clients.items() if not ts or now - ts[-1] >= self.period]
+        for cid in stale:
+            del self.clients[cid]
+        return len(stale)
+
 
 # Global rate limiter
 rate_limiter = RateLimiter(
@@ -58,6 +66,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         """Check rate limit before processing request."""
         if not settings.rate_limit_enabled:
             return await call_next(request)
+
+        # Periodic eviction — every 1000 requests
+        rate_limiter._call_count = getattr(rate_limiter, '_call_count', 0) + 1
+        if rate_limiter._call_count % 1000 == 0:
+            rate_limiter.evict_stale()
 
         # Get client identifier
         client_id = request.client.host if request.client else "unknown"

@@ -15,7 +15,7 @@ export default defineConfig({
   build: {
     target: 'ES2020',
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: process.env.NODE_ENV !== 'production',
     minify: 'esbuild',
     rollupOptions: {
       output: {

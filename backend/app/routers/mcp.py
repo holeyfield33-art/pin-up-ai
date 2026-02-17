@@ -9,10 +9,11 @@ from pydantic import BaseModel, ConfigDict
 from typing import Any
 
 from app.database import get_db
+from app.auth import verify_token
 from sqlalchemy.orm import Session
 from app.services import snippet_service, tag_service, collection_service, search_service
 
-router = APIRouter(prefix="/mcp", tags=["mcp"])
+router = APIRouter(prefix="/mcp", tags=["mcp"], dependencies=[Depends(verify_token)])
 
 # ── Tool definitions (mirrors mcp/server.py) ────────────────────────────
 TOOLS = [

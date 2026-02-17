@@ -14,7 +14,6 @@ def health():
     return {
         "status": "ok",
         "version": settings.app_version,
-        "db_path": settings.get_database_path(),
         "uptime_ms": get_uptime_ms(),
     }
 

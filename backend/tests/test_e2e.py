@@ -59,8 +59,8 @@ class TestHealth:
         data = r.json()
         assert data["status"] == "ok"
         assert data["version"] == "0.1.0"
-        assert "db_path" in data
         assert "uptime_ms" in data
+        assert "db_path" not in data  # no info leak
 
     def test_health_ready(self, client):
         r = client.get("/api/health/ready")

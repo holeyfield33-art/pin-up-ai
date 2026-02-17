@@ -38,12 +38,13 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    is_prod = settings.environment == "production"
     app = FastAPI(
         title="Pin-Up AI API",
         version=settings.app_version,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/api/openapi.json",
+        docs_url=None if is_prod else "/docs",
+        redoc_url=None if is_prod else "/redoc",
+        openapi_url=None if is_prod else "/api/openapi.json",
         lifespan=lifespan,
     )
 

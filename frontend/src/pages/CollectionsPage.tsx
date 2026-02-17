@@ -44,7 +44,18 @@ interface EditRowState {
 /* -------------------------------------------------------------------------- */
 export const CollectionsPage: React.FC<CollectionsPageProps> = ({ showToast }) => {
   const collectionsQuery = useCollections();
-  const createMut = useCreateCollection();, icon: ICONS[0], color: COLORS[0] });
+  const createMut = useCreateCollection();
+  const updateMut = useUpdateCollection();
+  const deleteMut = useDeleteCollection();
+
+  const [editRow, setEditRow] = useState<EditRowState | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const collections: CollectionOutWithCount[] = collectionsQuery.data?.items ?? [];
+
+  /* ── Start create ────────────────────────────────────────────────────── */
+  const startCreate = () => {
+    setEditRow({ collectionId: null, name: '', description: '', icon: ICONS[0], color: COLORS[0] });
     setConfirmDeleteId(null);
   };
 
@@ -56,15 +67,21 @@ export const CollectionsPage: React.FC<CollectionsPageProps> = ({ showToast }) =
       description: c.description ?? '',
       icon: c.icon ?? ICONS[0],
       color: c.color ?? COLORS[0],
-   
-  const collections: CollectionOutWithCount[] = collectionsQuery.data?.items ?? [];
-
-  /* ── Start create ────────────────────────────────────────────────────── */
-  const startCreate = () => {
-    setEditRow({ collectionId: null, name: '', description: '' });
+    });
     setConfirmDeleteId(null);
   };
 
+  /* ── Cancel ──────────────────────────────────────────────────────────── */
+  const cancel = () => setEditRow(null);
+
+  /* ── Save ────────────────────────────────────────────────────────────── */
+  const save = async () => {
+    if (!editRow || !editRow.name.trim()) return;
+    try {
+      if (editRow.collectionId) {
+        await updateMut.mutateAsync({
+          id: editRow.collectionId,
+          data: {
             name: editRow.name.trim(),
             description: editRow.description.trim() || undefined,
             icon: editRow.icon,
@@ -77,24 +94,7 @@ export const CollectionsPage: React.FC<CollectionsPageProps> = ({ showToast }) =
           name: editRow.name.trim(),
           description: editRow.description.trim() || undefined,
           icon: editRow.icon,
-          color: editRow.color
-  /* ── Cancel ──────────────────────────────────────────────────────────── */
-  const cancel = () => setEditRow(null);
-
-  /* ── Save ────────────────────────────────────────────────────────────── */
-  const save = async () => {
-    if (!editRow || !editRow.name.trim()) return;
-    try {
-      if (editRow.collectionId) {
-        await updateMut.mutateAsync({
-          id: editRow.collectionId,
-          data: { name: editRow.name.trim(), description: editRow.description.trim() || undefined },
-        });
-        showToast('Collection updated', 'success');
-      } else {
-        await createMut.mutateAsync({
-          name: editRow.name.trim(),
-          description: editRow.description.trim() || undefined,
+          color: editRow.color,
         });
         showToast('Collection created', 'success');
       }
@@ -139,146 +139,120 @@ export const CollectionsPage: React.FC<CollectionsPageProps> = ({ showToast }) =
       </div>
     );
   }
-dark:bg-gray-800 border-2 border-brand-300 dark:border-brand-600 rounded-lg p-4 space-y-3">
-            <input
-              autoFocus
-              type="text"
-              value={editRow.name}
-              onChange={(e) => setEditRow({ ...editRow, name: e.target.value })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') save();
-                if (e.key === 'Escape') cancel();
-              }}
-              placeholder="Collection name"
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-gray-900 dark:text-gray-100"
-            />
-            <textarea
-              value={editRow.description}
-              onChange={(e) => setEditRow({ ...editRow, description: e.target.value })}
-              placeholder="Description (optional)"
-              rows={2}
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white dark:bg-gray-900 dark:text-gray-100"
-            />
-            {/* Icon picker */}
-            <div>
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Icon</span>
-              <div className="flex gap-1 flex-wrap mt-1">
-                {ICONS.map((ic) => (
-                  <button
-                    key={ic}
-                    onClick={() => setEditRow({ ...editRow, icon: ic })}
-                    className={cn(
-                      'w-7 h-7 rounded text-base flex items-center justify-center border-2 transition-transform',
-                      editRow.icon === ic ? 'border-brand-500 scale-110 bg-brand-100 dark:bg-brand-900/30' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700',
-                    )}
-                  >
-                    {ic}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* Color picker */}
-            <div>
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Color</span>
-              <div className="flex gap-1 flex-wrap mt-1">
-                {COLORS.map((clr) => (
-                  <button
-                    key={clr}
-                    onClick={() => setEditRow({ ...editRow, color: clr })}
-                    className={cn(
-                      'w-5 h-5 rounded-full border-2 transition-transform',
-                      editdark:bg-gray-800 border rounded-lg p-4 space-y-2 transition-shadow hover:shadow-sm',
-                isEditingThis ? 'border-brand-300 bg-brand-50 dark:bg-gray-800' : 'border-gray-200 dark:border-gray-700',
-              )}
-              style={{ borderLeftWidth: 3, borderLeftColor: c.color ?? '#7C5CFC' }     style={{ backgroundColor: clr }}
-                    aria-label={`Color ${clr}`}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end">
+
+  /* ── Shared form (used for both create and inline edit) ──────────────── */
+  const renderForm = (isInline: boolean) => {
+    if (!editRow) return null;
+    const isPending = editRow.collectionId ? updateMut.isPending : createMut.isPending;
+    const actionLabel = editRow.collectionId ? 'Save' : 'Create';
+
+    return (
+      <div className={cn(
+        'bg-white dark:bg-gray-800 border-2 rounded-lg p-4 space-y-3',
+        'border-brand-300 dark:border-brand-600',
+      )}>
+        <input
+          autoFocus
+          type="text"
+          value={editRow.name}
+          onChange={(e) => setEditRow({ ...editRow, name: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') cancel();
+          }}
+          placeholder="Collection name"
+          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-gray-900 dark:text-gray-100"
+        />
+        <textarea
+          value={editRow.description}
+          onChange={(e) => setEditRow({ ...editRow, description: e.target.value })}
+          placeholder="Description (optional)"
+          rows={2}
+          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white dark:bg-gray-900 dark:text-gray-100"
+        />
+
+        {/* Icon picker */}
+        <div>
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Icon</span>
+          <div className="flex gap-1 flex-wrap mt-1">
+            {ICONS.map((ic) => (
               <button
-                onClick={save}
-                disabled={!editRow.name.trim() || createMut.isPending}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50"
+                key={ic}
+                onClick={() => setEditRow({ ...editRow, icon: ic })}
+                className={cn(
+                  'w-7 h-7 rounded text-base flex items-center justify-center border-2 transition-transform',
+                  editRow.icon === ic
+                    ? 'border-brand-500 scale-110 bg-brand-100 dark:bg-brand-900/30'
+                    : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700',
+                )}
               >
-                <Check className="w-3.5 h-3.5" />
-                Createdark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white dark:bg-gray-900 dark:text-gray-100"
-                  />
-                  <textarea
-                    value={editRow!.description}
-                    onChange={(e) => setEditRow({ ...editRow!, description: e.target.value })}
-                    placeholder="Description"
-                    rows={2}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white dark:bg-gray-900 dark:text-gray-100"
-                  />
-                  {/* Icon picker */}
-                  <div>
-                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Icon</span>
-                    <div className="flex gap-1 flex-wrap mt-1">
-                      {ICONS.map((ic) => (
-                        <button
-                          key={ic}
-                          onClick={() => setEditRow({ ...editRow!, icon: ic })}
-                          className={cn(
-                            'w-7 h-7 rounded text-base flex items-center justify-center border-2 transition-transform',
-                            editRow!.icon === ic ? 'border-brand-500 scale-110 bg-brand-100 dark:bg-brand-900/30' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700',
-                          )}
-                        >
-                          {ic}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Cspan
-                        className="w-6 h-6 rounded flex items-center justify-center text-sm shrink-0"
-                        style={{ backgroundColor: (c.color ?? '#7C5CFC') + '20' }}
-                      >
-                        {c.icon ?? '📁'}
-                      </span>
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-1
-                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Color</span>
-                    <div className="flex gap-1 flex-wrap mt-1">
-                      {COLORS.map((clr) => (
-                        <button
-                          key={clr}
-                          onClick={() => setEditRow({ ...editRow!, color: clr })}
-                          className={cn(
-                            'w-5 h-5 rounded-full border-2 transition-transform',
-                            editRow!.color === clr ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent',
-                          )}
-                          style={{ backgroundColor: clr }}
-                          aria-label={`Color ${clr}`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={save}
-                      disabled={!editRow!.name.trim() || updateMut.isPending}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Save
-                    </button>
-                    <button onClick={cancel} className="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-1
-                onClick={save}
-                disabled={!editRow.name.trim() || createMut.isPending}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50"
-              >
-                <Check className="w-3.5 h-3.5" />
-                Create
+                {ic}
               </button>
-              <button
-                onClick={cancel}
-                className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900"
-              >
-                Cancel
-              </button>
-            </div>
+            ))}
           </div>
-        )}
+        </div>
+
+        {/* Color picker */}
+        <div>
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Color</span>
+          <div className="flex gap-1 flex-wrap mt-1">
+            {COLORS.map((clr) => (
+              <button
+                key={clr}
+                onClick={() => setEditRow({ ...editRow, color: clr })}
+                className={cn(
+                  'w-5 h-5 rounded-full border-2 transition-transform',
+                  editRow.color === clr
+                    ? 'border-gray-900 dark:border-white scale-110'
+                    : 'border-transparent',
+                )}
+                style={{ backgroundColor: clr }}
+                aria-label={`Color ${clr}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={save}
+            disabled={!editRow.name.trim() || isPending}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50"
+          >
+            <Check className="w-3.5 h-3.5" />
+            {actionLabel}
+          </button>
+          <button
+            onClick={cancel}
+            className="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  /* ── Render ──────────────────────────────────────────────────────────── */
+  return (
+    <div className="flex-1 overflow-y-auto p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">Collections</h1>
+        <button
+          onClick={startCreate}
+          disabled={!!editRow}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50"
+        >
+          <Plus className="w-4 h-4" />
+          New Collection
+        </button>
+      </div>
+
+      {/* Grid */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        {/* New collection form */}
+        {editRow && !editRow.collectionId && renderForm(false)}
 
         {/* Collection cards */}
         {collections.map((c) => {
@@ -289,55 +263,31 @@ dark:bg-gray-800 border-2 border-brand-300 dark:border-brand-600 rounded-lg p-4 
             <div
               key={c.id}
               className={cn(
-                'bg-white border rounded-lg p-4 space-y-2 transition-shadow hover:shadow-sm',
-                isEditingThis ? 'border-brand-300 bg-brand-50' : 'border-gray-200',
+                'bg-white dark:bg-gray-800 border rounded-lg p-4 space-y-2 transition-shadow hover:shadow-sm',
+                isEditingThis
+                  ? 'border-brand-300 bg-brand-50 dark:bg-gray-800'
+                  : 'border-gray-200 dark:border-gray-700',
               )}
+              style={{ borderLeftWidth: 3, borderLeftColor: c.color ?? '#7C5CFC' }}
             >
               {isEditingThis ? (
-                <>
-                  <input
-                    autoFocus
-                    type="text"
-                    value={editRow!.name}
-                    onChange={(e) => setEditRow({ ...editRow!, name: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') save();
-                      if (e.key === 'Escape') cancel();
-                    }}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
-                  />
-                  <textarea
-                    value={editRow!.description}
-                    onChange={(e) => setEditRow({ ...editRow!, description: e.target.value })}
-                    placeholder="Description"
-                    rows={2}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none"
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={save}
-                      disabled={!editRow!.name.trim() || updateMut.isPending}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Save
-                    </button>
-                    <button onClick={cancel} className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900">
-                      Cancel
-                    </button>
-                  </div>
-                </>
+                renderForm(true)
               ) : (
                 <>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
-                      <Folder className="w-4 h-4 text-blue-500 shrink-0" />
-                      <h3 className="text-sm font-semibold text-gray-900">{c.name}</h3>
+                      <span
+                        className="w-6 h-6 rounded flex items-center justify-center text-sm shrink-0"
+                        style={{ backgroundColor: (c.color ?? '#7C5CFC') + '20' }}
+                      >
+                        {c.icon ?? '📁'}
+                      </span>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{c.name}</h3>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         onClick={() => startEdit(c)}
-                        className="p-1 text-gray-400 hover:text-gray-700"
+                        className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                         aria-label="Edit collection"
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -353,7 +303,7 @@ dark:bg-gray-800 border-2 border-brand-300 dark:border-brand-600 rounded-lg p-4 
                   </div>
 
                   {c.description && (
-                    <p className="text-xs text-gray-500 line-clamp-2">{c.description}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{c.description}</p>
                   )}
 
                   <div className="flex items-center gap-3 text-xs text-gray-400 pt-1">
@@ -366,7 +316,7 @@ dark:bg-gray-800 border-2 border-brand-300 dark:border-brand-600 rounded-lg p-4 
 
                   {/* Delete confirmation */}
                   {isDeletingThis && (
-                    <div className="flex items-center gap-2 pt-1 border-t border-gray-100 mt-2">
+                    <div className="flex items-center gap-2 pt-1 border-t border-gray-100 dark:border-gray-700 mt-2">
                       <span className="text-xs text-red-600">Delete this collection?</span>
                       <button
                         onClick={() => handleDelete(c.id)}
@@ -377,7 +327,7 @@ dark:bg-gray-800 border-2 border-brand-300 dark:border-brand-600 rounded-lg p-4 
                       </button>
                       <button
                         onClick={() => setConfirmDeleteId(null)}
-                        className="px-2 py-0.5 text-xs text-gray-600 hover:text-gray-900"
+                        className="px-2 py-0.5 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                       >
                         No
                       </button>
