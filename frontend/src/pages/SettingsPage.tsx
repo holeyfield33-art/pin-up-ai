@@ -46,8 +46,8 @@ const Section: React.FC<{
   iconColor?: string;
   children: React.ReactNode;
 }> = ({ title, icon: Icon, iconColor = 'text-brand-500', children }) => (
-  <div className="bg-white border border-gray-200 rounded-lg p-5 space-y-4">
-    <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 space-y-4">
+    <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
       <Icon className={cn('w-4 h-4', iconColor)} />
       {title}
     </h2>
@@ -190,16 +190,32 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ showToast }) => {
   /* ── Loading ─────────────────────────────────────────────────────────── */
   if (settingsQuery.isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-400" role="status">
+      <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500" role="status">
         <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
         <span className="ml-2 text-sm">Loading settings…</span>
       </div>
     );
   }
 
+  /* ── Error ───────────────────────────────────────────────────────────── */
+  if (settingsQuery.isError) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-red-500 gap-2 p-8">
+        <AlertTriangle className="w-8 h-8" />
+        <p className="text-sm font-medium">Failed to load settings</p>
+        <button
+          onClick={() => settingsQuery.refetch()}
+          className="mt-2 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+      <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
         <SettingsIcon className="w-5 h-5 text-brand-500" />
         Settings
       </h1>
@@ -209,8 +225,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ showToast }) => {
         {/* Dedupe */}
         <label className="flex items-center justify-between cursor-pointer">
           <div>
-            <p className="text-sm text-gray-700 font-medium">Deduplicate on import</p>
-            <p className="text-xs text-gray-500">Skip snippets with identical content hash</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">Deduplicate on import</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Skip snippets with identical content hash</p>
           </div>
           <button
             role="switch"
@@ -233,8 +249,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ showToast }) => {
         {/* Auto-backup */}
         <label className="flex items-center justify-between cursor-pointer">
           <div>
-            <p className="text-sm text-gray-700 font-medium">Auto-backup</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">Auto-backup</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Schedule: {settings?.backup_schedule || 'daily'}
             </p>
           </div>

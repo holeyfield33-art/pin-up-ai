@@ -8,9 +8,10 @@ import { Plus } from 'lucide-react';
 
 interface SnippetsPageProps {
   showToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
+  onSnippetLimit?: () => void;
 }
 
-export const SnippetsPage: React.FC<SnippetsPageProps> = ({ showToast }) => {
+export const SnippetsPage: React.FC<SnippetsPageProps> = ({ showToast, onSnippetLimit }) => {
   const searchQuery = useAppStore((s) => s.searchQuery);
   const setSearchQuery = useAppStore((s) => s.setSearchQuery);
   const selectedTag = useAppStore((s) => s.selectedTag);
@@ -66,7 +67,7 @@ export const SnippetsPage: React.FC<SnippetsPageProps> = ({ showToast }) => {
   return (
     <>
       {/* Header bar */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 shrink-0">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
         <SearchBar
           value={searchQuery}
           onChange={setSearchQuery}
@@ -99,6 +100,8 @@ export const SnippetsPage: React.FC<SnippetsPageProps> = ({ showToast }) => {
           isCreating={isCreating}
           onCreated={handleCreated}
           onCancelCreate={() => setIsCreating(false)}
+          onDeleted={() => setSelectedSnippetId(null)}
+          onSnippetLimit={onSnippetLimit}
           showToast={showToast}
         />
       </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   FileText,
@@ -51,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const licenseQuery = useLicense();
   const license = licenseQuery.data;
   const showUpgradeCard = license && license.plan === 'trial';
+  const [showAllTags, setShowAllTags] = useState(false);
 
   const statusColor: Record<string, string> = {
     connected: 'text-green-500',
@@ -164,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               All
             </button>
-            {tags.slice(0, 15).map((t) => (
+            {tags.slice(0, showAllTags ? undefined : 15).map((t) => (
               <button
                 key={t.id}
                 onClick={() => setSelectedTag(t.name)}
@@ -183,6 +184,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="text-xs text-gray-400">{t.count}</span>
               </button>
             ))}
+            {tags.length > 15 && (
+              <button
+                onClick={() => setShowAllTags((v) => !v)}
+                className="w-full px-2 py-1 text-xs text-brand-600 dark:text-brand-400 hover:underline text-left"
+              >
+                {showAllTags ? 'Show less' : `Show all ${tags.length} tags`}
+              </button>
+            )}
           </div>
         </>
       )}

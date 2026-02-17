@@ -126,7 +126,7 @@ export const TagsPage: React.FC<TagsPageProps> = ({ showToast }) => {
     <div className="flex-1 overflow-y-auto p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
           <TagIcon className="w-5 h-5 text-brand-500" />
           Tags
           <span className="text-sm font-normal text-gray-400">({tags.length})</span>
@@ -142,17 +142,17 @@ export const TagsPage: React.FC<TagsPageProps> = ({ showToast }) => {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
             <tr>
-              <th className="text-left px-4 py-2.5 font-medium text-gray-600">Color</th>
-              <th className="text-left px-4 py-2.5 font-medium text-gray-600">Name</th>
-              <th className="text-right px-4 py-2.5 font-medium text-gray-600">Snippets</th>
-              <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-32">Actions</th>
+              <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-gray-300">Color</th>
+              <th className="text-left px-4 py-2.5 font-medium text-gray-600 dark:text-gray-300">Name</th>
+              <th className="text-right px-4 py-2.5 font-medium text-gray-600 dark:text-gray-300">Snippets</th>
+              <th className="text-right px-4 py-2.5 font-medium text-gray-600 dark:text-gray-300 w-32">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {/* Create row */}
             {editRow && editRow.tagId === null && (
               <tr className="bg-brand-50">
@@ -250,12 +250,12 @@ export const TagsPage: React.FC<TagsPageProps> = ({ showToast }) => {
                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-brand-500 outline-none"
                       />
                     ) : (
-                      <span className="text-gray-900">{t.name}</span>
+                      <span className="text-gray-900 dark:text-gray-100">{t.name}</span>
                     )}
                   </td>
 
                   {/* Count */}
-                  <td className="px-4 py-2.5 text-right text-gray-500">{t.count}</td>
+                  <td className="px-4 py-2.5 text-right text-gray-500 dark:text-gray-400">{t.count}</td>
 
                   {/* Actions */}
                   <td className="px-4 py-2.5 text-right">

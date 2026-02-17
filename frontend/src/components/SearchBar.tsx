@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { debounce } from '../utils/helpers';
 
@@ -16,8 +16,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const [local, setLocal] = useState(value);
 
-  // Debounced callback
-  const debouncedOnChange = useCallback(debounce(onChange, 250), [onChange]);
+  // Stable debounced callback (persists across renders)
+  const debouncedRef = useRef(debounce(onChange, 250));
+  useEffect(() => {
+    debouncedRef.current = debounce(onChange, 250);
+  }, [onChange]);
+  const debouncedOnChange = debouncedRef.current;
 
   useEffect(() => {
     setLocal(value);
@@ -57,7 +61,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         value={local}
         onChange={handleChange}
         placeholder={placeholder}
-        className="w-full pl-10 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-colors"
+        className="w-full pl-10 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-gray-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-colors"
         aria-label="Search snippets"
       />
       {local && (

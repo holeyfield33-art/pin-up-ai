@@ -30,13 +30,13 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, icon: Icon, color = 'text-brand-600' }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-3">
-    <div className={cn('p-2 rounded-lg bg-gray-50', color)}>
+  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-3">
+    <div className={cn('p-2 rounded-lg bg-gray-50 dark:bg-gray-700', color)}>
       <Icon className="w-5 h-5" />
     </div>
     <div>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
     </div>
   </div>
 );
@@ -48,6 +48,7 @@ export const DashboardPage: React.FC = () => {
   const statsQuery = useStats();
   const licenseQuery = useLicense();
   const setPage = useAppStore((s) => s.setPage);
+  const setIsCreating = useAppStore((s) => s.setIsCreating);
 
   const stats = statsQuery.data;
   const license = licenseQuery.data;
@@ -84,7 +85,7 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+      <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
 
       {/* ── Totals grid ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -98,8 +99,8 @@ export const DashboardPage: React.FC = () => {
       {/* ── Two-column: top tags + top collections ─────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Top Tags */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-brand-500" />
             Top Tags
           </h2>
@@ -109,8 +110,8 @@ export const DashboardPage: React.FC = () => {
             <div className="space-y-2">
               {topTags.slice(0, 10).map((t) => (
                 <div key={t.name} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">{t.name}</span>
-                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{t.name}</span>
+                  <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
                     {t.count}
                   </span>
                 </div>
@@ -120,8 +121,8 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Top Collections */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-blue-500" />
             Top Collections
           </h2>
@@ -131,8 +132,8 @@ export const DashboardPage: React.FC = () => {
             <div className="space-y-2">
               {topCollections.slice(0, 10).map((c) => (
                 <div key={c.name} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">{c.name}</span>
-                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{c.name}</span>
+                  <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
                     {c.count}
                   </span>
                 </div>
@@ -145,33 +146,33 @@ export const DashboardPage: React.FC = () => {
       {/* ── Vault health + License ─────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Vault Health */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
             <HardDrive className="w-4 h-4 text-green-600" />
             Vault Health
           </h2>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">Database size</span>
-              <span className="font-medium text-gray-700">{formatBytes(vault.db_size_bytes)}</span>
+              <span className="text-gray-500 dark:text-gray-400">Database size</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">{formatBytes(vault.db_size_bytes)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">FTS entries</span>
-              <span className="font-medium text-gray-700">{vault.fts_entries}</span>
+              <span className="text-gray-500 dark:text-gray-400">FTS entries</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">{vault.fts_entries}</span>
             </div>
           </div>
         </div>
 
         {/* License Status */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
             <Shield className="w-4 h-4 text-indigo-600" />
             License
           </h2>
           {license ? (
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Status</span>
+                <span className="text-gray-500 dark:text-gray-400">Status</span>
                 <span
                   className={cn(
                     'font-medium px-2 py-0.5 rounded-full text-xs',
@@ -186,12 +187,12 @@ export const DashboardPage: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Days left</span>
-                <span className="font-medium text-gray-700">{license.days_left}</span>
+                <span className="text-gray-500 dark:text-gray-400">Days left</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">{license.days_left}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Plan</span>
-                <span className="font-medium text-gray-700">{license.plan}</span>
+                <span className="text-gray-500 dark:text-gray-400">Plan</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">{license.plan}</span>
               </div>
             </div>
           ) : (
@@ -201,14 +202,14 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* ── Quick Actions ──────────────────────────────────────────────── */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
           <Activity className="w-4 h-4 text-brand-500" />
           Quick Actions
         </h2>
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => setPage('snippets')}
+            onClick={() => { setPage('snippets'); setIsCreating(true); }}
             className="flex items-center gap-1.5 px-3 py-2 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700"
           >
             <Plus className="w-4 h-4" />
@@ -216,21 +217,21 @@ export const DashboardPage: React.FC = () => {
           </button>
           <button
             onClick={() => setPage('settings')}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             <Download className="w-4 h-4" />
             Export
           </button>
           <button
             onClick={() => setPage('settings')}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             <Upload className="w-4 h-4" />
             Import
           </button>
           <button
             onClick={() => setPage('settings')}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             <Database className="w-4 h-4" />
             Backup

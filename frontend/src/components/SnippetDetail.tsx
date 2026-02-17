@@ -35,6 +35,8 @@ interface SnippetDetailProps {
   isCreating: boolean;
   onCreated: (id: string) => void;
   onCancelCreate: () => void;
+  onDeleted?: () => void;
+  onSnippetLimit?: () => void;
   showToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
@@ -60,6 +62,8 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
   isCreating,
   onCreated,
   onCancelCreate,
+  onDeleted,
+  onSnippetLimit,
   showToast,
 }) => {
   /* ── Queries / mutations ─────────────────────────────────────────────── */
@@ -172,7 +176,11 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
         const created = await createMut.mutateAsync(payload);
         onCreated(created.id);
       } catch (e: any) {
-        showToast(e.message || 'Failed to create snippet', 'error');
+        const msg = e.message || 'Failed to create snippet';
+        if (msg.toLowerCase().includes('limit') || e.status === 403) {
+          onSnippetLimit?.();
+        }
+        showToast(msg, 'error');
       }
     } else if (snippetId) {
       const payload: SnippetPatchInput = {
@@ -200,6 +208,7 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
       await deleteMut.mutateAsync(snippetId);
       showToast('Snippet deleted', 'success');
       setConfirmDelete(false);
+      onDeleted?.();
     } catch (e: any) {
       showToast(e.message || 'Failed to delete', 'error');
     }
@@ -260,7 +269,7 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
       <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-3 p-8">
         <FileCode className="w-12 h-12" />
         <p className="text-sm">Select a snippet to view it here</p>
-        <p className="text-xs">or press <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 text-[11px]">⌘N</kbd> to create one</p>
+        <p className="text-xs">or press <kbd className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-[11px]">⌘N</kbd> to create one</p>
       </div>
     );
   }
@@ -298,8 +307,8 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
         onKeyDown={handleKeyDown}
       >
         {/* Toolbar */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 shrink-0 bg-gray-50">
-          <h2 className="text-sm font-semibold text-gray-700 flex-1">
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-700 shrink-0 bg-gray-50 dark:bg-gray-800">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex-1">
             {isCreating ? 'New Snippet' : 'Edit Snippet'}
           </h2>
           <button
@@ -312,7 +321,7 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
           </button>
           <button
             onClick={() => (isCreating ? onCancelCreate() : setIsEditing(false))}
-            className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900"
+            className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
           >
             Cancel
           </button>
@@ -322,7 +331,7 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Title */}
           <div>
-            <label htmlFor="snippet-title" className="block text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="snippet-title" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
               Title <span className="text-gray-400">(auto-inferred if blank)</span>
             </label>
             <input
@@ -331,13 +340,13 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
               value={form.title ?? ''}
               onChange={(e) => handleFieldChange('title', e.target.value)}
               placeholder="Untitled snippet"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
             />
           </div>
 
           {/* Body */}
           <div>
-            <label htmlFor="snippet-body" className="block text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="snippet-body" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
               Body <span className="text-red-500">*</span>
             </label>
             <textarea
@@ -347,52 +356,52 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
               onChange={(e) => handleFieldChange('body', e.target.value)}
               placeholder="Paste or type your snippet…"
               rows={14}
-              className="w-full px-3 py-2 text-sm font-mono border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-y"
+              className="w-full px-3 py-2 text-sm font-mono border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-y"
             />
           </div>
 
           {/* Language + Source row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="snippet-language" className="block text-xs font-medium text-gray-600 mb-1">Language</label>
+              <label htmlFor="snippet-language" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Language</label>
               <input
                 id="snippet-language"
                 type="text"
                 value={form.language ?? ''}
                 onChange={(e) => handleFieldChange('language', e.target.value)}
                 placeholder="e.g. python, javascript"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
               />
             </div>
             <div>
-              <label htmlFor="snippet-source" className="block text-xs font-medium text-gray-600 mb-1">Source</label>
+              <label htmlFor="snippet-source" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Source</label>
               <input
                 id="snippet-source"
                 type="text"
                 value={form.source ?? ''}
                 onChange={(e) => handleFieldChange('source', e.target.value)}
                 placeholder="e.g. clipboard, manual"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
               />
             </div>
           </div>
 
           {/* Source URL */}
           <div>
-            <label htmlFor="snippet-url" className="block text-xs font-medium text-gray-600 mb-1">Source URL</label>
+            <label htmlFor="snippet-url" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Source URL</label>
             <input
               id="snippet-url"
               type="url"
               value={form.source_url ?? ''}
               onChange={(e) => handleFieldChange('source_url', e.target.value)}
               placeholder="https://…"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
             />
           </div>
 
           {/* Tags */}
           <div>
-            <label htmlFor="snippet-tags" className="block text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="snippet-tags" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
               Tags <span className="text-gray-400">(comma-separated, auto-created)</span>
             </label>
             <input
@@ -401,13 +410,13 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
               value={form.tags_text}
               onChange={(e) => handleFieldChange('tags_text', e.target.value)}
               placeholder="react, hooks, patterns"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
             />
           </div>
 
           {/* Collections */}
           <div>
-            <label htmlFor="snippet-collections" className="block text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="snippet-collections" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
               Collections <span className="text-gray-400">(comma-separated, auto-created)</span>
             </label>
             <input
@@ -416,7 +425,7 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
               value={form.collections_text}
               onChange={(e) => handleFieldChange('collections_text', e.target.value)}
               placeholder="My Project, Tutorials"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+              className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
             />
           </div>
         </div>
@@ -432,8 +441,8 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-gray-200 shrink-0 bg-gray-50">
-        <h2 className="text-sm font-semibold text-gray-900 flex-1 truncate">
+      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-gray-200 dark:border-gray-700 shrink-0 bg-gray-50 dark:bg-gray-800">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex-1 truncate">
           {snippet.title || 'Untitled'}
         </h2>
 
@@ -442,7 +451,7 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
             populateForm(snippet);
             setIsEditing(true);
           }}
-          className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+          className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           aria-label="Edit snippet"
           title="Edit (⌘E)"
         >
@@ -450,7 +459,7 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
         </button>
         <button
           onClick={handleCopy}
-          className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+          className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           aria-label="Copy body"
           title="Copy to clipboard"
         >
@@ -458,9 +467,10 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
         </button>
         <button
           onClick={handlePin}
+          disabled={pinMut.isPending}
           className={cn(
-            'p-1.5 rounded-md hover:bg-gray-200',
-            snippet.pinned === 1 ? 'text-amber-500' : 'text-gray-500 hover:text-gray-700',
+            'p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50',
+            snippet.pinned === 1 ? 'text-amber-500' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200',
           )}
           aria-label={snippet.pinned === 1 ? 'Unpin' : 'Pin'}
           title={snippet.pinned === 1 ? 'Unpin' : 'Pin'}
@@ -469,7 +479,8 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
         </button>
         <button
           onClick={handleArchive}
-          className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+          disabled={archiveMut.isPending}
+          className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 disabled:opacity-50"
           aria-label={snippet.archived === 1 ? 'Unarchive' : 'Archive'}
           title={snippet.archived === 1 ? 'Unarchive' : 'Archive'}
         >
@@ -513,7 +524,7 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Meta */}
-        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
           {snippet.language && (
             <span className="flex items-center gap-1">
               <FileCode className="w-3.5 h-3.5" />
@@ -596,7 +607,7 @@ export const SnippetDetail: React.FC<SnippetDetailProps> = ({
             </span>
           )}
           {snippet.archived === 1 && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 flex items-center gap-1">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center gap-1">
               <Archive className="w-3 h-3" /> Archived
             </span>
           )}

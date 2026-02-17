@@ -98,7 +98,7 @@ export const SnippetList: React.FC<SnippetListProps> = ({
   /* ── Empty state ──────────────────────────────────────────────────────── */
   if (rows.length === 0) {
     return (
-      <div className="w-72 border-r border-gray-200 flex flex-col items-center justify-center text-gray-400 gap-3 p-6">
+      <div className="w-72 border-r border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-gray-400 gap-3 p-6">
         {isSearch ? (
           <>
             <SearchIcon className="w-8 h-8" />
@@ -119,7 +119,7 @@ export const SnippetList: React.FC<SnippetListProps> = ({
   return (
     <div
       ref={parentRef}
-      className="w-72 border-r border-gray-200 overflow-y-auto"
+      className="w-72 border-r border-gray-200 dark:border-gray-700 overflow-y-auto"
       role="listbox"
       aria-label={isSearch ? 'Search results' : 'Snippet list'}
     >
@@ -138,10 +138,10 @@ export const SnippetList: React.FC<SnippetListProps> = ({
               onClick={() => onSelect(row.id)}
               tabIndex={0}
               className={cn(
-                'absolute top-0 left-0 w-full px-3 py-2.5 text-left border-b border-gray-100 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-inset',
+                'absolute top-0 left-0 w-full px-3 py-2.5 text-left border-b border-gray-100 dark:border-gray-700 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-inset',
                 isSelected
-                  ? 'bg-brand-50 border-l-2 border-l-brand-600'
-                  : 'bg-white hover:bg-gray-50',
+                  ? 'bg-brand-50 dark:bg-brand-900/30 border-l-2 border-l-brand-600'
+                  : 'bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800',
               )}
               style={{
                 height: `${vItem.size}px`,
@@ -152,13 +152,13 @@ export const SnippetList: React.FC<SnippetListProps> = ({
               <div className="flex items-center gap-1.5 mb-0.5">
                 {row.pinned && <Pin className="w-3 h-3 text-amber-500 shrink-0" aria-label="Pinned" />}
                 {row.archived && <Archive className="w-3 h-3 text-gray-400 shrink-0" aria-label="Archived" />}
-                <span className="text-sm font-medium text-gray-900 truncate flex-1">
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate flex-1">
                   {row.title || 'Untitled'}
                 </span>
               </div>
 
               {/* Preview */}
-              <p className="text-xs text-gray-500 truncate mb-1">{row.preview || '\u00A0'}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-1">{row.preview || '\u00A0'}</p>
 
               {/* Meta row */}
               <div className="flex items-center gap-2 text-[11px] text-gray-400">

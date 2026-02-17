@@ -119,7 +119,7 @@ export default function App() {
   const renderPage = () => {
     switch (page) {
       case 'snippets':
-        return <SnippetsPage showToast={showToast} />;
+        return <SnippetsPage showToast={showToast} onSnippetLimit={() => setShowUpgradeModal(true)} />;
       case 'dashboard':
         return <DashboardPage />;
       case 'tags':
