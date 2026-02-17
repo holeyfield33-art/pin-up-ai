@@ -1,109 +1,73 @@
-"""Business logic for tag operations."""
+"""Tag service — CRUD with snippet counts."""
 
 import logging
 import uuid
-from datetime import datetime
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
+from typing import Optional
 
-from app.models import Tag, Snippet
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.models import Tag, snippet_tags, _now_ms
 
 logger = logging.getLogger(__name__)
 
 
-class TagService:
-    """Service for tag CRUD operations."""
-
-    @staticmethod
-    def create_tag(db: Session, name: str, color: str = "#6366F1") -> Tag:
-        """Create a new tag."""
-        tag_id = str(uuid.uuid4())
-
-        try:
-            tag = Tag(
-                id=tag_id,
-                name=name,
-                color=color,
-                created_at=datetime.utcnow(),
-            )
-            db.add(tag)
+def create_tag(db: Session, name: str, color: Optional[str] = None) -> Tag:
+    """Upsert by normalized name."""
+    norm = name.strip().lower()
+    existing = db.query(Tag).filter(func.lower(Tag.name) == norm).first()
+    if existing:
+        if color:
+            existing.color = color
             db.commit()
-            db.refresh(tag)
-            logger.info(f"Created tag: {tag_id}")
-            return tag
-        except IntegrityError as e:
-            db.rollback()
-            logger.warning(f"Tag already exists: {name}")
-            raise ValueError(f"Tag '{name}' already exists")
+            db.refresh(existing)
+        return existing
+    tag = Tag(id=str(uuid.uuid4()), name=norm, color=color, created_at=_now_ms())
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    return tag
 
-    @staticmethod
-    def get_tag(db: Session, tag_id: str) -> Tag | None:
-        """Get tag by ID."""
-        return db.query(Tag).filter(Tag.id == tag_id).first()
 
-    @staticmethod
-    def list_tags(db: Session, limit: int = 100, offset: int = 0) -> tuple[list[dict], int]:
-        """List all tags with usage count."""
-        # Get total count
-        total = db.query(func.count(Tag.id)).scalar()
+def get_tag(db: Session, tag_id: str) -> Optional[Tag]:
+    return db.query(Tag).filter(Tag.id == tag_id).first()
 
-        # Get tags with join to count snippets
-        tags = (
-            db.query(Tag)
-            .order_by(Tag.name.asc())
-            .offset(offset)
-            .limit(limit)
-            .all()
+
+def list_tags(db: Session) -> list[dict]:
+    """Return tags with snippet counts."""
+    rows = (
+        db.query(
+            Tag.id, Tag.name, Tag.color, Tag.created_at,
+            func.count(snippet_tags.c.snippet_id).label("count"),
         )
+        .outerjoin(snippet_tags, snippet_tags.c.tag_id == Tag.id)
+        .group_by(Tag.id)
+        .order_by(Tag.name)
+        .all()
+    )
+    return [
+        {"id": r[0], "name": r[1], "color": r[2], "created_at": r[3], "count": r[4]}
+        for r in rows
+    ]
 
-        # Build response with snippet counts
-        result = []
-        for tag in tags:
-            snippet_count = len(tag.snippets)
-            result.append({
-                "id": tag.id,
-                "name": tag.name,
-                "color": tag.color,
-                "created_at": tag.created_at,
-                "snippet_count": snippet_count,
-            })
 
-        return result, total
+def update_tag(db: Session, tag_id: str, name: Optional[str] = None, color: Optional[str] = None) -> Optional[Tag]:
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        return None
+    if name is not None:
+        tag.name = name.strip().lower()
+    if color is not None:
+        tag.color = color
+    db.commit()
+    db.refresh(tag)
+    return tag
 
-    @staticmethod
-    def delete_tag(db: Session, tag_id: str) -> bool:
-        """Delete tag and remove from snippets."""
-        tag = db.query(Tag).filter(Tag.id == tag_id).first()
-        if not tag:
-            return False
 
-        try:
-            db.delete(tag)
-            db.commit()
-            logger.info(f"Deleted tag: {tag_id}")
-            return True
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error deleting tag: {e}")
-            raise
-
-    @staticmethod
-    def update_tag(db: Session, tag_id: str, name: str = None, color: str = None) -> Tag | None:
-        """Update tag."""
-        tag = db.query(Tag).filter(Tag.id == tag_id).first()
-        if not tag:
-            return None
-
-        try:
-            if name:
-                tag.name = name
-            if color:
-                tag.color = color
-            db.commit()
-            db.refresh(tag)
-            logger.info(f"Updated tag: {tag_id}")
-            return tag
-        except IntegrityError:
-            db.rollback()
-            raise ValueError(f"Tag name '{name}' already exists")
+def delete_tag(db: Session, tag_id: str) -> bool:
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        return False
+    db.delete(tag)
+    db.commit()
+    return True

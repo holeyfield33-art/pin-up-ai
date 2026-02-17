@@ -1,162 +1,190 @@
-"""Pydantic v2 schemas for API request/response validation."""
+"""Pydantic v2 schemas matching api-contract.md exactly."""
 
-from datetime import datetime
+from __future__ import annotations
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-import html
+from pydantic import BaseModel, Field
 
 
-class TagBase(BaseModel):
-    """Base tag schema."""
+# ── Error envelope ──────────────────────────────────────────────────────
+class ErrorEnvelope(BaseModel):
+    code: str
+    message: str
+    details: dict | None = None
 
+
+# ── Tags ────────────────────────────────────────────────────────────────
+class TagCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    color: Optional[str] = Field(default="#6366F1", pattern="^#[0-9A-Fa-f]{6}$")
+    color: Optional[str] = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
-    @field_validator("name")
-    @classmethod
-    def sanitize_name(cls, v):
-        """Sanitize tag name."""
-        return html.escape(v.strip())
+class TagPatch(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    color: Optional[str] = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
-
-class TagCreate(TagBase):
-    """Tag creation schema."""
-
-    pass
-
-
-class TagOut(TagBase):
-    """Tag output schema."""
-
+class TagOut(BaseModel):
     id: str
-    created_at: datetime
+    name: str
+    color: str | None = None
+    created_at: int = 0
 
-    model_config = ConfigDict(from_attributes=True)
+class TagOutWithCount(TagOut):
+    count: int = 0
 
 
-class CollectionBase(BaseModel):
-    """Base collection schema."""
-
+# ── Collections ─────────────────────────────────────────────────────────
+class CollectionCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=1000)
+    description: Optional[str] = None
     icon: Optional[str] = Field(default=None, max_length=50)
-    color: Optional[str] = Field(default="#3B82F6", pattern="^#[0-9A-Fa-f]{6}$")
+    color: Optional[str] = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
-    @field_validator("name", "description")
-    @classmethod
-    def sanitize_text(cls, v):
-        """Sanitize text fields."""
-        if v is None:
-            return v
-        return html.escape(v.strip())
+class CollectionPatch(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    icon: Optional[str] = Field(default=None, max_length=50)
+    color: Optional[str] = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
-
-class CollectionCreate(CollectionBase):
-    """Collection creation schema."""
-
-    pass
-
-
-class CollectionOut(CollectionBase):
-    """Collection output schema."""
-
+class CollectionOut(BaseModel):
     id: str
-    created_at: datetime
-    updated_at: datetime
-    snippet_count: int = 0
+    name: str
+    description: str | None = None
+    icon: str | None = None
+    color: str | None = None
+    created_at: int = 0
+    updated_at: int = 0
 
-    model_config = ConfigDict(from_attributes=True)
+class CollectionOutWithCount(CollectionOut):
+    count: int = 0
 
 
-class SnippetBase(BaseModel):
-    """Base snippet schema."""
-
-    title: str = Field(..., min_length=1, max_length=255)
+# ── Snippets ────────────────────────────────────────────────────────────
+class SnippetCreate(BaseModel):
+    title: Optional[str] = None
     body: str = Field(..., min_length=1)
-    language: str = Field(default="plaintext", max_length=50)
-    source: Optional[str] = Field(default=None, max_length=255)
+    source: Optional[str] = None
+    source_url: Optional[str] = None
+    language: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)          # tag names
+    collections: list[str] = Field(default_factory=list)   # collection names
+    pinned: bool = False
 
-    @field_validator("title", "language", "source")
-    @classmethod
-    def sanitize_fields(cls, v):
-        """Sanitize string fields."""
-        if v is None:
-            return v
-        return html.escape(v.strip())
+class SnippetPatch(BaseModel):
+    title: Optional[str] = None
+    body: Optional[str] = None
+    source: Optional[str] = None
+    source_url: Optional[str] = None
+    language: Optional[str] = None
+    tags: Optional[list[str]] = None
+    collections: Optional[list[str]] = None
+    pinned: Optional[bool] = None
+    archived: Optional[bool] = None
 
-    @field_validator("body")
-    @classmethod
-    def validate_body(cls, v):
-        """Validate body content."""
-        if len(v) > 1_000_000:  # 1MB limit
-            raise ValueError("Snippet body exceeds maximum size")
-        return v
-
-
-class SnippetCreate(SnippetBase):
-    """Snippet creation schema."""
-
-    tag_ids: list[str] = Field(default_factory=list)
-    collection_ids: list[str] = Field(default_factory=list)
-
-
-class SnippetUpdate(BaseModel):
-    """Snippet update schema."""
-
-    title: Optional[str] = Field(None, min_length=1, max_length=255)
-    body: Optional[str] = Field(None, min_length=1)
-    language: Optional[str] = Field(None, max_length=50)
-    source: Optional[str] = Field(None, max_length=255)
-    tag_ids: Optional[list[str]] = None
-    collection_ids: Optional[list[str]] = None
-
-    @field_validator("title", "language", "source")
-    @classmethod
-    def sanitize_fields(cls, v):
-        """Sanitize string fields."""
-        if v is None:
-            return v
-        return html.escape(v.strip())
-
-
-class SnippetOut(SnippetBase):
-    """Snippet output schema."""
-
+class SnippetOut(BaseModel):
     id: str
-    created_at: datetime
-    updated_at: datetime
-    is_archived: bool = False
-    tags: list[TagOut] = []
-    collections: list[CollectionOut] = []
+    title: str
+    body: str
+    language: str | None = None
+    source: str | None = None
+    source_url: str | None = None
+    tags: list[TagOut] = Field(default_factory=list)
+    collections: list[CollectionOut] = Field(default_factory=list)
+    pinned: int = 0
+    archived: int = 0
+    created_at: int = 0
+    updated_at: int = 0
 
-    model_config = ConfigDict(from_attributes=True)
+class SnippetListResponse(BaseModel):
+    items: list[SnippetOut]
+    total: int
+
+class TagListResponse(BaseModel):
+    items: list[TagOutWithCount]
+    total: int
+
+class CollectionListResponse(BaseModel):
+    items: list[CollectionOutWithCount]
+    total: int
 
 
-class SearchQuery(BaseModel):
-    """Full-text search query schema."""
+# ── Search ──────────────────────────────────────────────────────────────
+class SearchResultItem(BaseModel):
+    id: str
+    title: str
+    preview: str
+    tags: list[str] = Field(default_factory=list)
+    collections: list[str] = Field(default_factory=list)
+    source: str | None = None
+    language: str | None = None
+    created_at: int = 0
+    updated_at: int = 0
 
-    query: str = Field(..., min_length=1, max_length=500)
-    limit: int = Field(default=50, ge=1, le=500)
-    offset: int = Field(default=0, ge=0)
-
-    @field_validator("query")
-    @classmethod
-    def sanitize_query(cls, v):
-        """Sanitize search query."""
-        return v.strip()
+class SearchResponse(BaseModel):
+    results: list[SearchResultItem]
+    total: int
 
 
+# ── Health ──────────────────────────────────────────────────────────────
 class HealthResponse(BaseModel):
-    """Health check response."""
-
     status: str
     version: str
-    database: str
+    db_path: str
+    uptime_ms: int
 
 
-class ExportResponse(BaseModel):
-    """Export response."""
+# ── Export / Import ─────────────────────────────────────────────────────
+class ExportRequest(BaseModel):
+    format: str = "json"   # json | markdown | bundle
+    scope: str = "all"     # all | collection | snippet
+    ids: list[str] = Field(default_factory=list)
 
-    format: str
-    size: int
-    content: str
+class ImportResponse(BaseModel):
+    ok: bool
+    imported: dict
+    merged: dict
+
+
+# ── Stats ───────────────────────────────────────────────────────────────
+class StatsResponse(BaseModel):
+    totals: dict
+    top_tags: list[dict]
+    top_collections: list[dict]
+    created_counts: dict
+    recent_activity: list[dict]
+    vault: dict
+
+
+# ── Settings ────────────────────────────────────────────────────────────
+class SettingsOut(BaseModel):
+    dedupe_enabled: bool = False
+    backup_enabled: bool = False
+    backup_schedule: str = "manual"
+
+class SettingsPatch(BaseModel):
+    dedupe_enabled: Optional[bool] = None
+    backup_enabled: Optional[bool] = None
+    backup_schedule: Optional[str] = None
+
+class RotateTokenResponse(BaseModel):
+    token: str
+
+
+# ── License ─────────────────────────────────────────────────────────────
+class LicenseStatus(BaseModel):
+    status: str   # trial_active | trial_expired | licensed_active | grace_period
+    days_left: int = 0
+    entitled: bool = False
+    plan: str = "trial"  # trial | pro | pro_plus
+
+class LicenseActivate(BaseModel):
+    license_key: str
+
+class OkResponse(BaseModel):
+    ok: bool = True
+
+
+# ── Backup ──────────────────────────────────────────────────────────────
+class BackupInfo(BaseModel):
+    name: str
+    created_at: int
+    db_size_bytes: int
+    app_version: str

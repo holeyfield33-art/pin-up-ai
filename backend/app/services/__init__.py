@@ -1,11 +1,23 @@
-"""Business logic service layer."""
+"""Services package."""
 
-from app.services.snippet_service import SnippetService
-from app.services.tag_service import TagService
-from app.services.collection_service import CollectionService
+from app.services import (
+    snippet_service,
+    tag_service,
+    collection_service,
+    search_service,
+    license_service,
+    export_service,
+    import_service,
+    backup_service,
+)
 
 __all__ = [
-    "SnippetService",
-    "TagService",
-    "CollectionService",
+    "snippet_service",
+    "tag_service",
+    "collection_service",
+    "search_service",
+    "license_service",
+    "export_service",
+    "import_service",
+    "backup_service",
 ]

@@ -1,13 +1,19 @@
-"""Search snippets tool."""
-from typing import Any
+"""Search snippets tool — thin wrapper for direct invocation."""
+
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend"))
+
+from app.database import SessionLocal, init_db
+from app.services import search_service
 
 
-def search_snippets(payload: dict[str, Any]) -> dict[str, Any]:
-    """Search snippets by query string.
-    
-    Args:
-        query (str): Search query
-        limit (int): Maximum results (default 50)
-    """
-    # This is now handled by server.py
-    return {"error": "Use server.py for actual implementation"}
+def search_snippets(query: str, limit: int = 10) -> list[dict]:
+    """Search snippets by query string using FTS5."""
+    init_db()
+    db = SessionLocal()
+    try:
+        results, total = search_service.search(db, q=query, limit=limit)
+        return results
+    finally:
+        db.close()

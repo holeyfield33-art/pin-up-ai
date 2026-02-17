@@ -1,76 +1,199 @@
-import React from 'react';
-import { formatDate, truncate } from '../utils/helpers';
-import type { Snippet } from '../types';
-import clsx from 'clsx';
+import React, { useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { Pin, Archive, Clock, FileCode, Search as SearchIcon, Inbox } from 'lucide-react';
+import { cn, formatDate, truncate } from '../utils/helpers';
+import { SnippetListSkeleton } from './Skeleton';
+import type { SnippetOut, SearchResultItem } from '../types';
 
+/* -------------------------------------------------------------------------- */
+/*  Props                                                                     */
+/* -------------------------------------------------------------------------- */
 interface SnippetListProps {
-  snippets: Snippet[];
+  /** Regular snippet items (when not searching) */
+  items: SnippetOut[];
+  /** Search result items (when searching) */
+  searchResults?: SearchResultItem[];
+  isLoading: boolean;
   selectedId: string | null;
-  onSelect: (snippet: Snippet) => void;
-  loading: boolean;
+  onSelect: (id: string) => void;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Normalised row — works for both snippet & search result                  */
+/* -------------------------------------------------------------------------- */
+interface Row {
+  id: string;
+  title: string;
+  preview: string;
+  language: string | null;
+  tags: string[];
+  pinned: boolean;
+  archived: boolean;
+  updatedAt: number;
+}
+
+function snippetToRow(s: SnippetOut): Row {
+  return {
+    id: s.id,
+    title: s.title,
+    preview: truncate(s.body.replace(/\n/g, ' '), 100),
+    language: s.language,
+    tags: s.tags.map((t) => t.name),
+    pinned: s.pinned === 1,
+    archived: s.archived === 1,
+    updatedAt: s.updated_at,
+  };
+}
+
+function searchToRow(r: SearchResultItem): Row {
+  return {
+    id: r.id,
+    title: r.title,
+    preview: r.preview,
+    language: r.language,
+    tags: r.tags,
+    pinned: false,
+    archived: false,
+    updatedAt: r.updated_at,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Row height (estimated)                                                    */
+/* -------------------------------------------------------------------------- */
+const ROW_HEIGHT = 76;
+
+/* -------------------------------------------------------------------------- */
+/*  Component                                                                 */
+/* -------------------------------------------------------------------------- */
 export const SnippetList: React.FC<SnippetListProps> = ({
-  snippets,
+  items,
+  searchResults,
+  isLoading,
   selectedId,
   onSelect,
-  loading,
 }) => {
-  if (loading) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const isSearch = !!searchResults;
+  const rows: Row[] = isSearch
+    ? searchResults!.map(searchToRow)
+    : items.map(snippetToRow);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 8,
+  });
+
+  /* ── Loading state ────────────────────────────────────────────────────── */
+  if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-gray-500">Loading snippets...</div>
+      <div className="w-72 border-r border-gray-200 dark:border-gray-700" role="status">
+        <SnippetListSkeleton count={6} />
       </div>
     );
   }
 
-  if (snippets.length === 0) {
+  /* ── Empty state ──────────────────────────────────────────────────────── */
+  if (rows.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center text-gray-500">
-          <p className="text-lg mb-2">No snippets yet</p>
-          <p className="text-sm">Create your first snippet to get started</p>
-        </div>
+      <div className="w-72 border-r border-gray-200 flex flex-col items-center justify-center text-gray-400 gap-3 p-6">
+        {isSearch ? (
+          <>
+            <SearchIcon className="w-8 h-8" />
+            <p className="text-sm text-center">No results found</p>
+          </>
+        ) : (
+          <>
+            <Inbox className="w-8 h-8" />
+            <p className="text-sm text-center">No snippets yet</p>
+            <p className="text-xs text-center">Click <strong>+ New</strong> to create one</p>
+          </>
+        )}
       </div>
     );
   }
 
+  /* ── Virtualised list ─────────────────────────────────────────────────── */
   return (
-    <div className="flex-1 border-r border-gray-200 overflow-y-auto">
-      {snippets.map((snippet) => (
-        <button
-          key={snippet.id}
-          onClick={() => onSelect(snippet)}
-          className={clsx(
-            'w-full p-4 border-b border-gray-100 text-left hover:bg-gray-50 transition-colors',
-            selectedId === snippet.id && 'bg-blue-50 border-l-4 border-blue-500'
-          )}
-        >
-          <h3 className="font-semibold text-gray-900 truncate">{snippet.title}</h3>
-          <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-            {truncate(snippet.body, 100)}
-          </p>
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
-              {snippet.language}
-            </span>
-            <span className="text-xs text-gray-500">{formatDate(snippet.created_at)}</span>
-          </div>
-          {snippet.tags.length > 0 && (
-            <div className="flex gap-1 mt-2">
-              {snippet.tags.slice(0, 3).map((tag) => (
-                <span
-                  key={tag.id}
-                  className="text-xs px-2 py-1 rounded-full"
-                  style={{ backgroundColor: tag.color + '20', color: tag.color }}
-                >
-                  {tag.name}
+    <div
+      ref={parentRef}
+      className="w-72 border-r border-gray-200 overflow-y-auto"
+      role="listbox"
+      aria-label={isSearch ? 'Search results' : 'Snippet list'}
+    >
+      <div
+        style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}
+      >
+        {virtualizer.getVirtualItems().map((vItem) => {
+          const row = rows[vItem.index];
+          const isSelected = row.id === selectedId;
+
+          return (
+            <button
+              key={row.id}
+              role="option"
+              aria-selected={isSelected}
+              onClick={() => onSelect(row.id)}
+              tabIndex={0}
+              className={cn(
+                'absolute top-0 left-0 w-full px-3 py-2.5 text-left border-b border-gray-100 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-inset',
+                isSelected
+                  ? 'bg-brand-50 border-l-2 border-l-brand-600'
+                  : 'bg-white hover:bg-gray-50',
+              )}
+              style={{
+                height: `${vItem.size}px`,
+                transform: `translateY(${vItem.start}px)`,
+              }}
+            >
+              {/* Title row */}
+              <div className="flex items-center gap-1.5 mb-0.5">
+                {row.pinned && <Pin className="w-3 h-3 text-amber-500 shrink-0" aria-label="Pinned" />}
+                {row.archived && <Archive className="w-3 h-3 text-gray-400 shrink-0" aria-label="Archived" />}
+                <span className="text-sm font-medium text-gray-900 truncate flex-1">
+                  {row.title || 'Untitled'}
                 </span>
-              ))}
-            </div>
-          )}
-        </button>
-      ))}
+              </div>
+
+              {/* Preview */}
+              <p className="text-xs text-gray-500 truncate mb-1">{row.preview || '\u00A0'}</p>
+
+              {/* Meta row */}
+              <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                {row.language && (
+                  <span className="flex items-center gap-0.5">
+                    <FileCode className="w-3 h-3" />
+                    {row.language}
+                  </span>
+                )}
+                <span className="flex items-center gap-0.5 ml-auto">
+                  <Clock className="w-3 h-3" />
+                  {formatDate(row.updatedAt)}
+                </span>
+              </div>
+
+              {/* Tags (show first 3) */}
+              {row.tags.length > 0 && (
+                <div className="flex gap-1 mt-1 flex-wrap">
+                  {row.tags.slice(0, 3).map((t) => (
+                    <span
+                      key={t}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-brand-100 text-brand-700"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                  {row.tags.length > 3 && (
+                    <span className="text-[10px] text-gray-400">+{row.tags.length - 3}</span>
+                  )}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };

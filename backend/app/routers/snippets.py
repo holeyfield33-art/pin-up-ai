@@ -1,111 +1,98 @@
-"""Snippets CRUD endpoints."""
+"""Snippets router — full CRUD + pin/unpin/archive/unarchive per api-contract.md."""
 
-import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import SnippetCreate, SnippetUpdate, SnippetOut
-from app.services import SnippetService
+from app.auth import verify_token
+from app.schemas import SnippetCreate, SnippetPatch, SnippetOut, SnippetListResponse
+from app.services import snippet_service as svc
+from app.services.snippet_service import SnippetLimitReached, DuplicateContent
 
-logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/snippets", tags=["snippets"])
+router = APIRouter(prefix="/snippets", tags=["snippets"], dependencies=[Depends(verify_token)])
 
 
-@router.get("", response_model=dict)
-async def list_snippets(
-    limit: int = Query(50, ge=1, le=500),
+@router.get("", response_model=SnippetListResponse)
+def list_snippets(
+    limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    collection_id: str = Query(None),
-    tag_id: str = Query(None),
+    tag_id: str | None = None,
+    collection_id: str | None = None,
+    pinned: bool | None = None,
+    archived: bool | None = None,
+    sort: str = Query("newest", pattern="^(newest|pinned)$"),
     db: Session = Depends(get_db),
 ):
-    """List all snippets with pagination."""
-    try:
-        snippets, total = SnippetService.list_snippets(
-            db, limit=limit, offset=offset, collection_id=collection_id, tag_id=tag_id
-        )
-        return {
-            "data": [SnippetOut.model_validate(s) for s in snippets],
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-        }
-    except Exception as e:
-        logger.error(f"Error listing snippets: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch snippets")
+    items, total = svc.list_snippets(
+        db, limit=limit, offset=offset, tag_id=tag_id,
+        collection_id=collection_id, pinned=pinned, archived=archived, sort=sort,
+    )
+    return {"items": [svc.snippet_to_dict(s) for s in items], "total": total}
 
 
 @router.post("", response_model=SnippetOut, status_code=201)
-async def create_snippet(
-    snippet_create: SnippetCreate,
-    db: Session = Depends(get_db),
-):
-    """Create a new snippet."""
+def create_snippet(body: SnippetCreate, db: Session = Depends(get_db)):
     try:
-        snippet = SnippetService.create_snippet(db, snippet_create)
-        return SnippetOut.model_validate(snippet)
-    except ValueError as e:
-        logger.error(f"Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error creating snippet: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create snippet")
+        s = svc.create_snippet(db, body.model_dump())
+    except SnippetLimitReached as e:
+        raise HTTPException(status_code=403, detail={"code": "SNIPPET_LIMIT_REACHED", "message": str(e)})
+    except DuplicateContent as e:
+        raise HTTPException(status_code=409, detail={"code": "DUPLICATE_CONTENT", "message": str(e)})
+    return svc.snippet_to_dict(s)
 
 
 @router.get("/{snippet_id}", response_model=SnippetOut)
-async def get_snippet(snippet_id: str, db: Session = Depends(get_db)):
-    """Get a snippet by ID."""
-    snippet = SnippetService.get_snippet(db, snippet_id)
-    if not snippet:
-        raise HTTPException(status_code=404, detail="Snippet not found")
-    return SnippetOut.model_validate(snippet)
+def get_snippet(snippet_id: str, db: Session = Depends(get_db)):
+    s = svc.get_snippet(db, snippet_id)
+    if not s:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": f"Snippet {snippet_id} not found"})
+    return svc.snippet_to_dict(s)
 
 
-@router.put("/{snippet_id}", response_model=SnippetOut)
-async def update_snippet(
-    snippet_id: str,
-    update: SnippetUpdate,
-    db: Session = Depends(get_db),
-):
-    """Update a snippet."""
-    try:
-        snippet = SnippetService.update_snippet(db, snippet_id, update)
-        if not snippet:
-            raise HTTPException(status_code=404, detail="Snippet not found")
-        return SnippetOut.model_validate(snippet)
-    except Exception as e:
-        logger.error(f"Error updating snippet: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update snippet")
+@router.patch("/{snippet_id}", response_model=SnippetOut)
+def update_snippet(snippet_id: str, body: SnippetPatch, db: Session = Depends(get_db)):
+    data = body.model_dump(exclude_unset=True)
+    s = svc.update_snippet(db, snippet_id, data)
+    if not s:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": f"Snippet {snippet_id} not found"})
+    return svc.snippet_to_dict(s)
 
 
-@router.delete("/{snippet_id}", status_code=204)
-async def delete_snippet(snippet_id: str, db: Session = Depends(get_db)):
-    """Delete a snippet."""
-    success = SnippetService.delete_snippet(db, snippet_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Snippet not found")
-    return None
+@router.delete("/{snippet_id}")
+def delete_snippet(snippet_id: str, db: Session = Depends(get_db)):
+    ok = svc.delete_snippet(db, snippet_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": f"Snippet {snippet_id} not found"})
+    return {"ok": True}
 
 
-@router.get("/export/{format}", response_model=dict)
-async def export_snippets(
-    format: str,
-    db: Session = Depends(get_db),
-):
-    """Export all snippets in specified format."""
-    if format not in ["json", "markdown"]:
-        raise HTTPException(status_code=400, detail="Invalid format. Use 'json' or 'markdown'")
-    
-    try:
-        content = SnippetService.export_snippets(db, format=format)
-        return {
-            "format": format,
-            "size": len(content),
-            "content": content,
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error exporting snippets: {e}")
-        raise HTTPException(status_code=500, detail="Failed to export snippets")
+@router.post("/{snippet_id}/pin", response_model=SnippetOut)
+def pin_snippet(snippet_id: str, db: Session = Depends(get_db)):
+    s = svc.pin_snippet(db, snippet_id)
+    if not s:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": f"Snippet {snippet_id} not found"})
+    return svc.snippet_to_dict(s)
+
+
+@router.post("/{snippet_id}/unpin", response_model=SnippetOut)
+def unpin_snippet(snippet_id: str, db: Session = Depends(get_db)):
+    s = svc.unpin_snippet(db, snippet_id)
+    if not s:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": f"Snippet {snippet_id} not found"})
+    return svc.snippet_to_dict(s)
+
+
+@router.post("/{snippet_id}/archive", response_model=SnippetOut)
+def archive_snippet(snippet_id: str, db: Session = Depends(get_db)):
+    s = svc.archive_snippet(db, snippet_id)
+    if not s:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": f"Snippet {snippet_id} not found"})
+    return svc.snippet_to_dict(s)
+
+
+@router.post("/{snippet_id}/unarchive", response_model=SnippetOut)
+def unarchive_snippet(snippet_id: str, db: Session = Depends(get_db)):
+    s = svc.unarchive_snippet(db, snippet_id)
+    if not s:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": f"Snippet {snippet_id} not found"})
+    return svc.snippet_to_dict(s)

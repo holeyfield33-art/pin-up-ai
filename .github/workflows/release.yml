@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Require CI to pass before releasing
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Build the Python sidecar binary ──────────────────────────────────
+  build-sidecar:
+    name: Build Sidecar (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary: pinup-backend
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            binary: pinup-backend
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: pinup-backend.exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pyinstaller
+
+      - name: Build sidecar binary
+        run: |
+          cd backend
+          pyinstaller --onefile --name pinup-backend \
+            --hidden-import uvicorn.logging \
+            --hidden-import uvicorn.lifespan.on \
+            --hidden-import uvicorn.lifespan.off \
+            --hidden-import uvicorn.protocols.http.auto \
+            --hidden-import uvicorn.protocols.http.h11_impl \
+            --hidden-import uvicorn.protocols.websockets.auto \
+            --collect-submodules app \
+            main.py
+        shell: bash
+
+      - name: Upload sidecar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sidecar-${{ matrix.target }}
+          path: backend/dist/${{ matrix.binary }}
+
+  # ── Build the Tauri desktop app ──────────────────────────────────────
+  build-tauri:
+    name: Build Tauri (${{ matrix.os }})
+    needs: build-sidecar
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev \
+            libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Download sidecar
+        uses: actions/download-artifact@v4
+        with:
+          name: sidecar-${{ matrix.target }}
+          path: frontend/src-tauri/binaries/
+
+      - name: Make sidecar executable
+        if: runner.os != 'Windows'
+        run: chmod +x frontend/src-tauri/binaries/pinup-backend
+
+      - name: Rename sidecar for Tauri target triple
+        shell: bash
+        run: |
+          cd frontend/src-tauri/binaries
+          if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]]; then
+            mv pinup-backend pinup-backend-x86_64-unknown-linux-gnu
+          elif [[ "${{ matrix.target }}" == "aarch64-apple-darwin" ]]; then
+            mv pinup-backend pinup-backend-aarch64-apple-darwin
+          elif [[ "${{ matrix.target }}" == "x86_64-pc-windows-msvc" ]]; then
+            mv pinup-backend.exe pinup-backend-x86_64-pc-windows-msvc.exe
+          fi
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          projectPath: frontend
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Pin-Up AI ${{ github.ref_name }}'
+          releaseBody: |
+            See [CHANGELOG.md](https://github.com/holeyfield33-art/pin-up-ai/blob/main/CHANGELOG.md) for details.
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true

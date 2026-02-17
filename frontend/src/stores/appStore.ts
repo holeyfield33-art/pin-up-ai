@@ -1,56 +1,120 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Zustand store — global app state
+// ─────────────────────────────────────────────────────────────────────────────
 import { create } from 'zustand';
-import type { Snippet, Tag, Collection, AppState } from '../types';
+import type {
+  SnippetOut,
+  TagOutWithCount,
+  CollectionOutWithCount,
+  BackendStatus,
+  Page,
+} from '../types';
 
-interface Store extends AppState {
-  // Actions
-  setSnippets: (snippets: Snippet[]) => void;
-  setSelectedSnippet: (snippet: Snippet | null) => void;
-  setTags: (tags: Tag[]) => void;
-  setCollections: (collections: Collection[]) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
-  setBackendStatus: (status: AppState['backendStatus']) => void;
-  addSnippet: (snippet: Snippet) => void;
-  removeSnippet: (id: string) => void;
-  updateSnippet: (id: string, snippet: Partial<Snippet>) => void;
+type Theme = 'light' | 'dark' | 'system';
+
+interface AppStore {
+  // Theme
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+
+  // Navigation
+  page: Page;
+  setPage: (p: Page) => void;
+
+  // Backend status
+  backendStatus: BackendStatus;
+  setBackendStatus: (s: BackendStatus) => void;
+
+  // Sidebar filter state
+  selectedTag: string | null;       // tag name
+  selectedCollection: string | null; // collection name
+  setSelectedTag: (t: string | null) => void;
+  setSelectedCollection: (c: string | null) => void;
+
+  // Snippet list cache
+  snippets: SnippetOut[];
+  snippetsTotal: number;
+  setSnippets: (items: SnippetOut[], total: number) => void;
+
+  // Selected snippet
+  selectedSnippetId: string | null;
+  setSelectedSnippetId: (id: string | null) => void;
+
+  // Tags/collections cache
+  tags: TagOutWithCount[];
+  setTags: (t: TagOutWithCount[]) => void;
+  collections: CollectionOutWithCount[];
+  setCollections: (c: CollectionOutWithCount[]) => void;
+
+  // Search
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+
+  // Editing
+  isEditing: boolean;
+  setIsEditing: (e: boolean) => void;
+  isCreating: boolean;
+  setIsCreating: (c: boolean) => void;
+
+  // Loading / error
+  loading: boolean;
+  setLoading: (l: boolean) => void;
+  error: string | null;
+  setError: (e: string | null) => void;
 }
 
-export const useStore = create<Store>((set) => ({
-  // Initial state
-  snippets: [],
-  selectedSnippet: null,
-  tags: [],
-  collections: [],
-  loading: false,
-  error: null,
-  backendStatus: 'checking',
+function getInitialTheme(): Theme {
+  const stored = localStorage.getItem('pinup_theme');
+  if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+  return 'system';
+}
 
-  // Actions
-  setSnippets: (snippets) => set({ snippets }),
-  setSelectedSnippet: (selectedSnippet) => set({ selectedSnippet }),
-  setTags: (tags) => set({ tags }),
-  setCollections: (collections) => set({ collections }),
-  setLoading: (loading) => set({ loading }),
-  setError: (error) => set({ error }),
+function applyTheme(theme: Theme) {
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('dark', isDark);
+}
+
+export const useAppStore = create<AppStore>((set) => ({
+  theme: getInitialTheme(),
+  setTheme: (theme) => {
+    localStorage.setItem('pinup_theme', theme);
+    applyTheme(theme);
+    set({ theme });
+  },
+
+  page: 'snippets',
+  setPage: (page) => set({ page }),
+
+  backendStatus: 'checking',
   setBackendStatus: (backendStatus) => set({ backendStatus }),
 
-  addSnippet: (snippet) =>
-    set((state) => ({
-      snippets: [snippet, ...state.snippets],
-    })),
+  selectedTag: null,
+  selectedCollection: null,
+  setSelectedTag: (selectedTag) => set({ selectedTag, selectedCollection: null }),
+  setSelectedCollection: (selectedCollection) => set({ selectedCollection, selectedTag: null }),
 
-  removeSnippet: (id) =>
-    set((state) => ({
-      snippets: state.snippets.filter((s) => s.id !== id),
-      selectedSnippet: state.selectedSnippet?.id === id ? null : state.selectedSnippet,
-    })),
+  snippets: [],
+  snippetsTotal: 0,
+  setSnippets: (items, total) => set({ snippets: items, snippetsTotal: total }),
 
-  updateSnippet: (id, updates) =>
-    set((state) => ({
-      snippets: state.snippets.map((s) => (s.id === id ? { ...s, ...updates } : s)),
-      selectedSnippet:
-        state.selectedSnippet?.id === id
-          ? { ...state.selectedSnippet, ...updates }
-          : state.selectedSnippet,
-    })),
+  selectedSnippetId: null,
+  setSelectedSnippetId: (selectedSnippetId) => set({ selectedSnippetId }),
+
+  tags: [],
+  setTags: (tags) => set({ tags }),
+  collections: [],
+  setCollections: (collections) => set({ collections }),
+
+  searchQuery: '',
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
+
+  isEditing: false,
+  setIsEditing: (isEditing) => set({ isEditing }),
+  isCreating: false,
+  setIsCreating: (isCreating) => set({ isCreating }),
+
+  loading: false,
+  setLoading: (loading) => set({ loading }),
+  error: null,
+  setError: (error) => set({ error }),
 }));

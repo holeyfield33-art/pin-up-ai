@@ -1,36 +1,32 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
-interface Toast {
-  id: string;
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
+
+export interface ToastData {
   message: string;
-  type: 'success' | 'error' | 'info' | 'warning';
-  duration?: number;
+  type: ToastType;
 }
 
-export const useToast = () => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+export function useToast(defaultDuration = 3000) {
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const addToast = useCallback(
-    (message: string, type: Toast['type'] = 'info', duration = 3000) => {
-      const id = Math.random().toString(36).substr(2, 9);
-      const toast = { id, message, type, duration };
-
-      setToasts((prev) => [...prev, toast]);
-
-      if (duration > 0) {
-        setTimeout(() => {
-          setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, duration);
-      }
-
-      return id;
-    },
-    []
-  );
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+  const hideToast = useCallback(() => {
+    setToast(null);
+    if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
 
-  return { toasts, addToast, removeToast };
-};
+  const showToast = useCallback(
+    (message: string, type: ToastType = 'info', duration?: number) => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      setToast({ message, type });
+      const ms = duration ?? defaultDuration;
+      if (ms > 0) {
+        timerRef.current = setTimeout(() => setToast(null), ms);
+      }
+    },
+    [defaultDuration],
+  );
+
+  return { toast, showToast, hideToast };
+}

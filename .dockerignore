@@ -1,0 +1,32 @@
+# Python
+**/__pycache__
+**/*.pyc
+**/.venv
+*.egg-info
+
+# Node
+**/node_modules
+frontend/dist
+
+# DB / data
+*.db
+*.db-wal
+*.db-shm
+backups/
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# CI
+.github
+
+# Tauri (not needed in container)
+frontend/src-tauri

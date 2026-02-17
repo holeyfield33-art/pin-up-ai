@@ -54,10 +54,10 @@ Pin-Up AI brings your favorite AI responses into a secure, private, fully-featur
 └──────────────────────────────────────────────────────────────────────┘
 
 MCP TOOLS (Agent Integration):
-  • search_snippets(query, limit) - Full-text search
+  • search_snippets(query, limit, offset) - Full-text search
   • get_snippet(id) - Retrieve by ID
   • list_snippets(limit, offset) - Paginated list
-  • create_snippet(title, body, language, source, tags) - Create new
+  • create_snippet(title, body, language, source, tag_ids, collection_ids) - Create new
   • list_collections() - Browse collections
   • list_tags() - Browse tags
 
@@ -200,7 +200,7 @@ PUT /api/snippets/{snippet_id}
 
 {
   "title": "Updated Title",
-  "tags_ids": ["new-tag-id"]
+  "tag_ids": ["new-tag-id"]
 }
 ```
 
@@ -213,7 +213,7 @@ DELETE /api/snippets/{snippet_id}
 
 #### Search Snippets
 ```http
-GET /api/search/query?q=async&limit=50&offset=0
+GET /api/snippets/search/query?q=async&limit=50&offset=0
 ```
 
 #### Export Snippets
@@ -383,7 +383,8 @@ POST /api/mcp/tools/{tool_name}/call
   - `body` (string, required): Content
   - `language` (string, optional): Programming language
   - `source` (string, optional): Source URL/name
-  - `tags` (array[string], optional): Tag names to create/attach
+  - `tag_ids` (array[string], optional): Tag IDs to attach
+  - `collection_ids` (array[string], optional): Collection IDs to attach
 - **Returns:** Created snippet
 
 #### list_collections
@@ -463,14 +464,34 @@ CREATE TABLE snippet_collections (
 
 ### Full-Text Search (FTS5)
 ```sql
-CREATE VIRTUAL TABLE snippets_fts USING fts5(title, body);
+CREATE VIRTUAL TABLE snippets_fts USING fts5(
+  snippet_id UNINDEXED,
+  title,
+  body,
+  language,
+  source
+);
 
 -- Triggers to keep FTS index in sync
 CREATE TRIGGER snippets_fts_insert
 AFTER INSERT ON snippets
 BEGIN
-  INSERT INTO snippets_fts(rowid, title, body) 
-  VALUES (NEW.rowid, NEW.title, NEW.body);
+  INSERT INTO snippets_fts(snippet_id, title, body, language, source)
+  VALUES (NEW.id, NEW.title, NEW.body, NEW.language, NEW.source);
+END;
+
+CREATE TRIGGER snippets_fts_update
+AFTER UPDATE ON snippets
+BEGIN
+  DELETE FROM snippets_fts WHERE snippet_id = OLD.id;
+  INSERT INTO snippets_fts(snippet_id, title, body, language, source)
+  VALUES (NEW.id, NEW.title, NEW.body, NEW.language, NEW.source);
+END;
+
+CREATE TRIGGER snippets_fts_delete
+AFTER DELETE ON snippets
+BEGIN
+  DELETE FROM snippets_fts WHERE snippet_id = OLD.id;
 END;
 ```
 

@@ -1,47 +1,49 @@
-"""Health check endpoints."""
+"""Health check router — no auth required."""
 
-import logging
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-
-from app.database import get_db
-from app.schemas import HealthResponse
+import os
+from fastapi import APIRouter
+from sqlalchemy import text
 from app.config import settings
+from app.database import get_uptime_ms, SessionLocal
 
-logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/health", tags=["health"])
+router = APIRouter(tags=["health"])
 
 
-@router.get("", response_model=HealthResponse)
-async def health_check(db: Session = Depends(get_db)):
-    """Health check endpoint."""
+@router.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "version": settings.app_version,
+        "db_path": settings.get_database_path(),
+        "uptime_ms": get_uptime_ms(),
+    }
+
+
+@router.get("/health/ready")
+def health_ready():
+    """Readiness check — verifies DB is accessible."""
+    db = SessionLocal()
     try:
-        # Test database connection
-        db.execute("SELECT 1")
-        db_status = "healthy"
-    except Exception as e:
-        logger.error(f"Database health check failed: {e}")
-        db_status = "unhealthy"
-
-    return HealthResponse(
-        status="healthy" if db_status == "healthy" else "degraded",
-        version=settings.app_version,
-        database=db_status,
-    )
-
-
-@router.get("/ready", response_model=dict)
-async def readiness_check(db: Session = Depends(get_db)):
-    """Readiness check endpoint."""
-    try:
-        db.execute("SELECT 1")
-        return {"ready": True, "timestamp": __import__("datetime").datetime.utcnow().isoformat()}
-    except Exception as e:
-        logger.error(f"Readiness check failed: {e}")
-        return {"ready": False, "error": str(e)}
+        db.execute(text("SELECT 1")).fetchone()
+        return {
+            "status": "ready",
+            "database": "connected",
+            "version": settings.app_version,
+        }
+    except Exception as exc:
+        return {
+            "status": "not_ready",
+            "database": "error",
+            "error": str(exc),
+        }
+    finally:
+        db.close()
 
 
-@router.get("/live", response_model=dict)
-async def liveness_check():
-    """Liveness check endpoint."""
-    return {"alive": True, "version": settings.app_version}
+@router.get("/health/live")
+def health_live():
+    """Liveness check — confirms the process is running."""
+    return {
+        "status": "alive",
+        "uptime_ms": get_uptime_ms(),
+    }

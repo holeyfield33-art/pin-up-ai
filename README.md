@@ -1,85 +1,82 @@
 # 📌 Pin-Up AI
 
-**Local-first desktop companion for saving, organizing, and searching AI conversation highlights.**
+**Never lose a great AI answer again.**
 
-Pin-Up AI brings your favorite AI responses into a personal vault—fast, private, and fully local. Perfect for developers, researchers, and anyone who captures valuable insights from their AI chats.
+Pin-Up AI is a local-first desktop app for saving, organizing, and searching your best AI conversation highlights — from ChatGPT, Claude, Grok, Perplexity, or any AI chat.
 
-## ✨ Features
+Everything stays on your machine. No cloud, no accounts, no tracking.
 
-- **⭐ Pin Any Message** - Capture outputs from ChatGPT, Claude, Grok, Perplexity, or any AI chat
-- **🏷️ Smart Tagging** - Organize snippets with flexible tag system
-- **📁 Collections** - Group related snippets into project-based collections
-- **🔍 Full-Text Search** - Blazing-fast FTS5-powered search across all content
-- **💬 Language Detection** - Auto-detect and syntax-highlight code snippets
-- **🤖 MCP Integration** - Connect AI agents to your snippet vault
-- **🔒 100% Private** - All data stored locally, no cloud sync
-- **📊 Usage Analytics** - Track tags and collections with snippet counts
+---
 
-## 🏗️ Architecture
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **Pin Messages** | Save valuable AI outputs with one click |
+| **Full-Text Search** | Blazing-fast FTS5 search across all snippets |
+| **Tags & Collections** | Organize by topic, project, or language |
+| **Syntax Highlighting** | Auto-detect and highlight 100+ languages |
+| **Dark Mode** | Full light/dark/system theme support |
+| **Keyboard Shortcuts** | `⌘N` new, `⌘K` search, `⌘S` save, `⌘?` help |
+| **MCP Integration** | Give AI agents access to your snippet vault |
+| **Import/Export** | JSON export, file import, backup & restore |
+| **Freemium Model** | Free (100 snippets) · Pro (unlimited) |
+
+## Architecture
 
 ```
-Pin-Up AI/
-├── frontend/          # Tauri + React + Tailwind desktop app
-│   ├── src-tauri/     # Rust backend for Tauri
-│   ├── src/           # React components & UI
-│   └── package.json   # Frontend dependencies
-├── backend/           # FastAPI REST API
-│   ├── main.py        # FastAPI app with CORS, logging
-│   ├── database.py    # SQLite + FTS5 setup
-│   ├── models.py      # Pydantic validation
-│   └── routers/       # API endpoints
-├── mcp/               # MCP server for AI agents
-│   ├── server.py      # Tool handlers
-│   └── tools/         # AI-callable tools
-└── requirements.txt   # Python dependencies
+Tauri Desktop Shell (Rust)
+├── React 18 Frontend (TypeScript + Tailwind CSS)
+│   ├── Zustand state management
+│   ├── TanStack Query (data fetching)
+│   └── TanStack Virtual (virtualized lists)
+├── FastAPI Backend (Python sidecar)
+│   ├── SQLite + FTS5 full-text search
+│   ├── Pydantic v2 validation
+│   └── Bearer token auth
+└── MCP Server (stdio JSON-RPC 2.0)
+    └── 6 tools: search, get, list, create, list_tags, list_collections
 ```
 
-## 🚀 Quick Start
+All data is stored locally:
+- **macOS:** `~/Library/Application Support/com.pinup-ai.app/`
+- **Windows:** `%APPDATA%/com.pinup-ai.app/`
+- **Linux:** `~/.config/com.pinup-ai.app/`
+
+## Quick Start
 
 ### Prerequisites
-- Python 3.11+
-- Node.js 16+  
-- Rust 1.60+ (for Tauri desktop app)
 
-### Backend Setup
+- Python 3.11+
+- Node.js 18+
+- Rust 1.60+ (for Tauri desktop builds)
+
+### Backend
 
 ```bash
 cd backend
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# Run development server
-uvicorn main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
-Backend: `http://localhost:8000`  
-Docs: `http://localhost:8000/docs`
+API docs: http://localhost:8000/api/docs
 
-### Frontend Setup
+### Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Run development server (Vite)
 npm run dev
 ```
 
-Frontend: `http://localhost:5173`
+App: http://localhost:5173
 
-### Desktop App (Tauri)
+### Desktop (Tauri)
 
 ```bash
 cd frontend
-npm install
-npm run tauri dev  # Requires Rust
+npm run tauri dev
 ```
 
 ### MCP Server
@@ -89,201 +86,154 @@ cd mcp
 python server.py
 ```
 
-## 📚 API Documentation
+The MCP server uses stdio JSON-RPC 2.0. Configure your AI agent with:
 
-### Base URL
-```
-http://localhost:8000
-```
-
-### Snippets API
-
-#### List Snippets
-```
-GET /snippets/?limit=50&offset=0&collection_id=1
-```
-
-#### Create Snippet
-```
-POST /snippets/
+```json
 {
-  "title": "Title",
-  "body": "Content",
-  "language": "python",
-  "source": "ChatGPT",
-  "tags": [1, 2],
-  "collection_id": 1
+  "mcpServers": {
+    "pinup-ai": {
+      "command": "python",
+      "args": ["mcp/server.py"],
+      "transport": "stdio"
+    }
+  }
 }
 ```
 
-#### Get Snippet
-```
-GET /snippets/{id}
-```
+## API Reference
 
-#### Delete Snippet
-```
-DELETE /snippets/{id}
-```
+Base URL: `http://localhost:8000/api`
 
-#### Search Snippets
-```
-GET /snippets/search/query?q=machine+learning&limit=50
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check (no auth) |
+| `GET` | `/snippets` | List snippets (paginated, filterable) |
+| `POST` | `/snippets` | Create snippet |
+| `GET` | `/snippets/{id}` | Get snippet by ID |
+| `PATCH` | `/snippets/{id}` | Update snippet |
+| `DELETE` | `/snippets/{id}` | Delete snippet |
+| `POST` | `/snippets/{id}/pin` | Pin snippet |
+| `POST` | `/snippets/{id}/unpin` | Unpin snippet |
+| `POST` | `/snippets/{id}/archive` | Archive snippet |
+| `POST` | `/snippets/{id}/unarchive` | Unarchive snippet |
+| `GET` | `/search?q=…` | Full-text search |
+| `GET` | `/tags` | List tags with counts |
+| `POST` | `/tags` | Create/upsert tag |
+| `PATCH` | `/tags/{id}` | Update tag |
+| `DELETE` | `/tags/{id}` | Delete tag |
+| `GET` | `/collections` | List collections with counts |
+| `POST` | `/collections` | Create collection |
+| `PATCH` | `/collections/{id}` | Update collection |
+| `DELETE` | `/collections/{id}` | Delete collection |
+| `GET` | `/stats` | Dashboard statistics |
+| `GET` | `/settings` | Get app settings |
+| `PATCH` | `/settings` | Update settings |
+| `POST` | `/settings/rotate-token` | Rotate API token |
+| `GET` | `/license/status` | License status |
+| `POST` | `/license/activate` | Activate license key |
+| `POST` | `/license/deactivate` | Deactivate license |
+| `POST` | `/export` | Export data (JSON or ZIP bundle) |
+| `POST` | `/import` | Import data file |
+| `POST` | `/backup/run` | Create backup |
+| `GET` | `/backup/list` | List backups |
+| `POST` | `/backup/restore` | Restore from backup |
 
-### Tags API
+All endpoints (except `/health`) require `Authorization: Bearer <token>`.
 
-#### List Tags
-```
-GET /tags/?limit=100
-```
+## Testing
 
-#### Create Tag
-```
-POST /tags/
-{"name": "typescript"}
-```
+### Backend (40 tests, 84% coverage)
 
-### Collections API
-
-#### List Collections
-```
-GET /collections/?limit=100
-```
-
-#### Create Collection
-```
-POST /collections/
-{
-  "name": "Web Dev",
-  "description": "Web development tips"
-}
-```
-
-### Health Check
-```
-GET /health
-```
-
-## 🤖 MCP Server Tools
-
-Available tools for AI agents:
-- `search_snippets` - Full-text search
-- `get_snippet` - Get specific snippet
-- `list_snippets` - List all snippets
-- `create_snippet` - Add new snippet
-- `list_collections` - Get collections
-- `list_tags` - Get tags
-
-## 🗄️ Database
-
-SQLite with FTS5 full-text search:
-- **snippets** - Main snippet data
-- **tags** - Tag names
-- **collections** - Collection names
-- **snippet_tags** - Many-to-many relationships
-- **snippet_collections** - Collection membership
-- **snippets_fts** - Full-text search index
-
-All tables have cascade delete enabled.
-
-## 🔒 Security
-
-- **CORS enabled** for localhost (5173, 3000, 8000)
-- **Parameterized queries** prevent SQL injection
-- **Input validation** with Pydantic models
-- **Transaction-based** database operations
-- **Foreign keys** enforced
-
-## 📦 Environment Variables
-
-```env
-PINUP_DB=./pinup.db
-MCP_PORT=8765
-BACKEND_HOST=127.0.0.1
-BACKEND_PORT=8000
-```
-
-## 🛠️ Development
-
-### Run All Services
-
-**Terminal 1 - Backend:**
 ```bash
-cd backend && source .venv/bin/activate && uvicorn main:app --reload
+cd backend
+python -m pytest tests/ -x -q --tb=short
+python -m pytest tests/ --cov=app --cov-report=term-missing  # coverage
 ```
 
-**Terminal 2 - Frontend:**
-```bash
-cd frontend && npm run dev
-```
+### Frontend (35 tests)
 
-**Terminal 3 - MCP (optional):**
-```bash
-cd mcp && python server.py
-```
-
-Access at: `http://localhost:5173`
-
-## 📦 Production Build
-
-### Desktop
 ```bash
 cd frontend
-npm run build
-npm run tauri build
+npm test              # single run
+npm run test:watch    # watch mode
 ```
 
-### Backend
+### MCP (21 tests)
+
 ```bash
-gunicorn main:app --port 8000 --workers 4
+python -m pytest mcp/tests/test_mcp.py -x -q
 ```
 
-### Docker
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY backend/requirements.txt .
-RUN pip install -r requirements.txt
-COPY backend .
-CMD ["gunicorn", "main:app"]
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `⌘K` / `Ctrl+K` | Focus search |
+| `⌘N` / `Ctrl+N` | New snippet |
+| `⌘S` / `Ctrl+S` | Save snippet |
+| `⌘,` / `Ctrl+,` | Settings |
+| `⌘E` / `Ctrl+E` | Export |
+| `⌘?` / `Ctrl+/` | Shortcut help |
+| `Esc` | Cancel / close |
+
+## Project Structure
+
+```
+pin-up-ai/
+├── backend/
+│   ├── app/
+│   │   ├── routers/        # API endpoints (10 routers)
+│   │   ├── services/       # Business logic (8 services)
+│   │   ├── security/       # CORS, rate limiting, logging, request ID
+│   │   ├── config.py       # Pydantic settings
+│   │   ├── database.py     # SQLite + FTS5 setup
+│   │   ├── models.py       # SQLAlchemy ORM models
+│   │   └── schemas.py      # Pydantic request/response schemas
+│   ├── tests/              # pytest E2E tests (40 tests)
+│   ├── alembic/            # Database migrations
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── components/     # SearchBar, Sidebar, SnippetList, SnippetDetail,
+│   │   │                   # Toast, WelcomeWizard, ShortcutHelp, Skeleton
+│   │   ├── pages/          # Snippets, Dashboard, Tags, Collections, Settings
+│   │   ├── hooks/          # useApi (TanStack Query), useToast
+│   │   ├── stores/         # Zustand app store (theme, nav, filters)
+│   │   ├── api/            # API client with auth
+│   │   ├── types/          # TypeScript interfaces
+│   │   └── utils/          # formatDate, debounce, cn
+│   ├── src-tauri/          # Rust: sidecar, IPC, system tray
+│   └── package.json
+└── mcp/
+    ├── server.py           # stdio JSON-RPC 2.0 MCP server
+    └── tools/              # 6 tool handlers
 ```
 
-## ⚡ Performance
+## Tech Stack
 
-- FTS5 search: ~50ms for 100k snippets
-- React virtual scrolling for large lists
-- Native Tauri performance
-- Async/await throughout backend
+| Layer | Technology |
+|-------|-----------|
+| Desktop | Tauri 1.5 (Rust) |
+| Frontend | React 18, TypeScript 5.3, Tailwind 3, Vite 5 |
+| State | Zustand 4, TanStack Query 5 |
+| Backend | FastAPI, SQLAlchemy, Pydantic v2 |
+| Database | SQLite + FTS5, WAL mode |
+| MCP | Custom stdio JSON-RPC 2.0 |
+| Testing | pytest (backend), Vitest + RTL (frontend) |
 
-## 🐛 Troubleshooting
+## Security
 
-### Backend connection fails
-```bash
-curl http://localhost:8000/health
-```
+- All data stored locally — no cloud sync
+- Bearer token authentication (SHA-256 hashed)
+- Parameterized SQL queries (no f-string SQL)
+- CORS restricted to localhost + Tauri webview
+- Rate limiting on all API endpoints
+- Request ID tracking for debugging
 
-### Reset database
-```bash
-rm pinup.db
-# Restart backend
-```
+## License
 
-### CORS errors
-Check frontend URL is in allowlist in `main.py`
-
-## 🎯 Roadmap
-
-- v0.2: Advanced search filters
-- v0.3: Browser extension
-- v0.4: Mobile app
-- v0.5: Collaborative mode
-- v1.0: Plugin marketplace
-
-## 📝 License
-
-MIT License
+MIT License — see [LICENSE](LICENSE)
 
 ---
 
-**Questions?** APIs at `/docs` when backend is running.
+Built with care by **AshuraStudio**

@@ -49,7 +49,7 @@ def setup_logging() -> None:
     """Configure application logging."""
     # Create logger
     logger = logging.getLogger()
-    logger.setLevel(settings.log_level)
+    logger.setLevel(settings.pinup_log_level)
 
     # Remove existing handlers
     for handler in logger.handlers[:]:
@@ -57,7 +57,7 @@ def setup_logging() -> None:
 
     # Create console handler
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(settings.log_level)
+    console_handler.setLevel(settings.pinup_log_level)
 
     # Set formatter based on configuration
     if settings.log_format == "json":
@@ -72,4 +72,4 @@ def setup_logging() -> None:
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
-    logger.info(f"Logging configured: format={settings.log_format}, level={settings.log_level}")
+    logger.info(f"Logging configured: format={settings.log_format}, level={settings.pinup_log_level}")

@@ -1,8 +1,19 @@
-"""List collections tool."""
-from typing import Any
+"""List collections tool — thin wrapper for direct invocation."""
+
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+    __file__))), "backend"))
+
+from app.database import SessionLocal, init_db
+from app.services import collection_service
 
 
-def list_collections(payload: dict[str, Any]) -> dict[str, Any]:
-    """List all Pin-Up AI collections."""
-    # This is now handled by server.py
-    return {"error": "Use server.py for actual implementation"}
+def list_collections() -> list[dict]:
+    """List all collections with snippet counts."""
+    init_db()
+    db = SessionLocal()
+    try:
+        return collection_service.list_collections(db)
+    finally:
+        db.close()

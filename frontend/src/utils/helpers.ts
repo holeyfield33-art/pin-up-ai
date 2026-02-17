@@ -1,48 +1,56 @@
-export const KEYBOARD_SHORTCUTS = {
-  SEARCH: { key: 'p', ctrl: true, label: 'Ctrl+P' },
-  SAVE: { key: 's', ctrl: true, label: 'Ctrl+S' },
-  COMMAND_PALETTE: { key: 'k', ctrl: true, label: 'Ctrl+K' },
-  FOCUS_TITLE: { key: 't', ctrl: true, label: 'Ctrl+T' },
-  DELETE: { key: 'Delete', label: 'Delete' },
-  ESCAPE: { key: 'Escape', label: 'Esc' },
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// Utility helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
-export const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+/** Format epoch-ms timestamp to human-readable relative string */
+export function formatDate(epochMs: number): string {
+  const now = Date.now();
+  const diff = now - epochMs;
+  const mins = Math.floor(diff / 60_000);
+  const hours = Math.floor(diff / 3_600_000);
+  const days = Math.floor(diff / 86_400_000);
 
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return new Date(epochMs).toLocaleDateString();
+}
 
-  return date.toLocaleDateString();
-};
+/** Format bytes to human-readable */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
-export const highlightCode = (code: string, language: string): string => {
-  // Simple escape for now; in production, use highlight.js
-  return code
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-};
-
-export const truncate = (str: string, length: number): string => {
+/** Truncate a string */
+export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
-  return str.substring(0, length) + '...';
-};
+  return str.substring(0, length) + '…';
+}
 
-export const debounce = <T extends (...args: any[]) => any>(
+/** Debounce */
+export function debounce<T extends (...args: any[]) => any>(
   fn: T,
-  delay: number
-): ((...args: Parameters<T>) => void) => {
-  let timeoutId: NodeJS.Timeout;
+  delay: number,
+): (...args: Parameters<T>) => void {
+  let timer: ReturnType<typeof setTimeout>;
   return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
   };
-};
+}
+
+/** Simple classname merge */
+export function cn(...classes: (string | false | null | undefined)[]): string {
+  return classes.filter(Boolean).join(' ');
+}
+
+/** Keyboard shortcuts */
+export const SHORTCUTS = {
+  SEARCH: { key: 'k', ctrl: true, label: '⌘K' },
+  NEW: { key: 'n', ctrl: true, label: '⌘N' },
+  SAVE: { key: 's', ctrl: true, label: '⌘S' },
+  ESCAPE: { key: 'Escape', label: 'Esc' },
+} as const;

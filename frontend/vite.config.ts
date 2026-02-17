@@ -16,6 +16,21 @@ export default defineConfig({
     target: 'ES2020',
     outDir: 'dist',
     sourcemap: true,
-    minify: 'terser',
+    minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          hljs: ['highlight.js'],
+          tauri: ['@tauri-apps/api'],
+        },
+      },
+    },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/__tests__/setup.ts'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    css: true,
   },
 })

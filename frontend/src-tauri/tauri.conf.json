@@ -1,0 +1,84 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "Pin-Up AI",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "http": {
+        "scope": [
+          "http://127.0.0.1:*/*",
+          "http://localhost:*/*",
+          "https://github.com/holeyfield33-art/pin-up-ai/**",
+          "https://api.github.com/**"
+        ]
+      },
+      "fs": {
+        "all": false,
+        "scope": ["$LOCALDATA/pin-up-ai/**", "$APPDATA/pin-up-ai/**"]
+      },
+      "window": {
+        "all": true
+      },
+      "dialog": {
+        "all": true
+      },
+      "shell": {
+        "sidecar": true,
+        "scope": [
+          {
+            "name": "binaries/pinup-backend",
+            "sidecar": true,
+            "args": true
+          }
+        ]
+      },
+      "process": {
+        "relaunch": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": ["msi", "app", "deb", "dmg"],
+      "identifier": "com.pinupai.app",
+      "externalBin": [
+        "binaries/pinup-backend"
+      ]
+    },
+    "systemTray": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 700,
+        "resizable": true,
+        "title": "Pin-Up AI",
+        "width": 1100,
+        "minHeight": 500,
+        "minWidth": 680,
+        "decorations": true,
+        "center": true
+      }
+    ],
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/holeyfield33-art/pin-up-ai/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
+    },
+    "security": {
+      "csp": null
+    }
+  }
+}

@@ -1,138 +1,113 @@
-"""Business logic for collection operations."""
+"""Collection service — CRUD with snippet counts."""
 
 import logging
 import uuid
-from datetime import datetime
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
+from typing import Optional
 
-from app.models import Collection, Snippet
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.models import Collection, snippet_collections, _now_ms
 
 logger = logging.getLogger(__name__)
 
 
-class CollectionService:
-    """Service for collection CRUD operations."""
-
-    @staticmethod
-    def create_collection(
-        db: Session,
-        name: str,
-        description: str = None,
-        icon: str = None,
-        color: str = "#3B82F6",
-    ) -> Collection:
-        """Create a new collection."""
-        collection_id = str(uuid.uuid4())
-
-        try:
-            collection = Collection(
-                id=collection_id,
-                name=name,
-                description=description,
-                icon=icon,
-                color=color,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            )
-            db.add(collection)
+def create_collection(
+    db: Session,
+    name: str,
+    description: Optional[str] = None,
+    icon: Optional[str] = None,
+    color: Optional[str] = None,
+) -> Collection:
+    norm = name.strip()
+    existing = db.query(Collection).filter(func.lower(Collection.name) == func.lower(norm)).first()
+    if existing:
+        changed = False
+        if description is not None:
+            existing.description = description
+            changed = True
+        if icon is not None:
+            existing.icon = icon
+            changed = True
+        if color is not None:
+            existing.color = color
+            changed = True
+        if changed:
+            existing.updated_at = _now_ms()
             db.commit()
-            db.refresh(collection)
-            logger.info(f"Created collection: {collection_id}")
-            return collection
-        except IntegrityError as e:
-            db.rollback()
-            logger.error(f"Error creating collection: {e}")
-            raise ValueError("Failed to create collection")
+            db.refresh(existing)
+        return existing
+    now = _now_ms()
+    col = Collection(
+        id=str(uuid.uuid4()),
+        name=norm,
+        description=description,
+        icon=icon or "📁",
+        color=color or "#7C5CFC",
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(col)
+    db.commit()
+    db.refresh(col)
+    return col
 
-    @staticmethod
-    def get_collection(db: Session, collection_id: str) -> Collection | None:
-        """Get collection by ID."""
-        return db.query(Collection).filter(Collection.id == collection_id).first()
 
-    @staticmethod
-    def list_collections(db: Session, limit: int = 100, offset: int = 0) -> tuple[list[dict], int]:
-        """List all collections with snippet count."""
-        # Get total count
-        total = db.query(Collection).count()
+def get_collection(db: Session, collection_id: str) -> Optional[Collection]:
+    return db.query(Collection).filter(Collection.id == collection_id).first()
 
-        # Get collections
-        collections = (
-            db.query(Collection)
-            .order_by(Collection.name.asc())
-            .offset(offset)
-            .limit(limit)
-            .all()
+
+def list_collections(db: Session) -> list[dict]:
+    rows = (
+        db.query(
+            Collection.id, Collection.name, Collection.description,
+            Collection.icon, Collection.color,
+            Collection.created_at, Collection.updated_at,
+            func.count(snippet_collections.c.snippet_id).label("count"),
         )
+        .outerjoin(snippet_collections, snippet_collections.c.collection_id == Collection.id)
+        .group_by(Collection.id)
+        .order_by(Collection.name)
+        .all()
+    )
+    return [
+        {
+            "id": r[0], "name": r[1], "description": r[2],
+            "icon": r[3], "color": r[4],
+            "created_at": r[5], "updated_at": r[6], "count": r[7],
+        }
+        for r in rows
+    ]
 
-        # Build response with snippet counts
-        result = []
-        for collection in collections:
-            snippet_count = len(collection.snippets)
-            result.append({
-                "id": collection.id,
-                "name": collection.name,
-                "description": collection.description,
-                "icon": collection.icon,
-                "color": collection.color,
-                "created_at": collection.created_at,
-                "updated_at": collection.updated_at,
-                "snippet_count": snippet_count,
-            })
 
-        return result, total
+def update_collection(
+    db: Session, collection_id: str,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    icon: Optional[str] = None,
+    color: Optional[str] = None,
+) -> Optional[Collection]:
+    col = db.query(Collection).filter(Collection.id == collection_id).first()
+    if not col:
+        return None
+    if name is not None:
+        col.name = name.strip()
+    if description is not None:
+        col.description = description
+    if icon is not None:
+        col.icon = icon
+    if color is not None:
+        col.color = color
+    col.updated_at = _now_ms()
+    db.commit()
+    db.refresh(col)
+    return col
 
-    @staticmethod
-    def update_collection(
-        db: Session,
-        collection_id: str,
-        name: str = None,
-        description: str = None,
-        icon: str = None,
-        color: str = None,
-    ) -> Collection | None:
-        """Update collection."""
-        collection = db.query(Collection).filter(Collection.id == collection_id).first()
-        if not collection:
-            return None
 
-        try:
-            if name:
-                collection.name = name
-            if description is not None:
-                collection.description = description
-            if icon:
-                collection.icon = icon
-            if color:
-                collection.color = color
-            
-            collection.updated_at = datetime.utcnow()
-            db.commit()
-            db.refresh(collection)
-            logger.info(f"Updated collection: {collection_id}")
-            return collection
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error updating collection: {e}")
-            raise
-
-    @staticmethod
-    def delete_collection(db: Session, collection_id: str) -> bool:
-        """Delete collection."""
-        collection = db.query(Collection).filter(Collection.id == collection_id).first()
-        if not collection:
-            return False
-
-        try:
-            # Remove collection from all snippets
-            for snippet in collection.snippets:
-                snippet.collections.remove(collection)
-            
-            db.delete(collection)
-            db.commit()
-            logger.info(f"Deleted collection: {collection_id}")
-            return True
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error deleting collection: {e}")
-            raise
+def delete_collection(db: Session, collection_id: str) -> bool:
+    col = db.query(Collection).filter(Collection.id == collection_id).first()
+    if not col:
+        return False
+    db.delete(col)
+    db.commit()
+    return True
